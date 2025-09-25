@@ -1,0 +1,512 @@
+{% extends "base.html" %}
+
+{% block title %}
+上传测评集 - Kumi
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- 二级导航栏 -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <nav class="nav nav-pills justify-content-center">
+                <a class="nav-link" href="/web/llm/config" data-page="config">配置被测大模型</a>
+                <a class="nav-link active" href="/web/llm/upload-dataset" data-page="dataset">上传测评集</a>
+                <a class="nav-link" href="/web/llm/upload-rules" data-page="rules">创建测评规则</a>
+                <a class="nav-link" href="/web/llm/evaluation" data-page="evaluation">测评任务</a>
+            </nav>
+        </div>
+    </div>
+
+    <!-- 主体内容 -->
+    <div class="row justify-content-center">
+        <div class="col-12 col-xl-10">
+            <div class="card">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center mb-4">
+                        <h5 class="card-title text-primary mb-0">测评集管理</h5>
+                        <button class="btn btn-gradient-primary" onclick="showUploadModal()">
+                            <i class="bi bi-cloud-upload"></i> 上传测评集
+                        </button>
+
+                    </div>
+
+                    <!-- 数据表格 -->
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>测评集名称</th>
+                                    <th>文件大小</th>
+                                    <th>更新时间</th>
+                                    <th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody id="datasetsTableBody">
+                                <tr>
+                                    <td colspan="4" class="text-center text-muted">
+                                        <i class="bi bi-hourglass-split"></i> 加载中...
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 上传测评集弹窗 -->
+<div class="modal fade" id="uploadDatasetModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">上传测评集</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="uploadDatasetForm">
+                <div class="modal-body">
+                    <div class="upload-area border border-2 border-dashed rounded p-4 text-center" id="uploadArea">
+                        <i class="bi bi-cloud-upload text-primary mb-3" style="font-size: 3rem;"></i>
+                        <p class="mb-2">拖放文件到此处或点击选择文件</p>
+                        <p class="text-muted small">支持 .csv 和 .xlsx 格式</p>
+                        <input type="file" class="form-control" id="datasetFile" name="file" accept=".csv,.xlsx" style="display: none;">
+                        <button type="button" class="btn btn-outline-primary" onclick="document.getElementById('datasetFile').click()">选择文件</button>
+                    </div>
+
+                    <!-- 文件信息显示 -->
+                    <div id="fileInfo" class="mt-3" style="display: none;">
+                        <div class="alert alert-info">
+                            <i class="bi bi-file-earmark-text"></i>
+                            <strong>文件信息：</strong>
+                            <div id="fileName"></div>
+                            <div id="fileSize"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="submit" class="btn btn-gradient-primary" id="uploadBtn" disabled>上传</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<style>
+/* Consistent nav-pills styling as per previous page */
+.nav-pills .nav-link.active {
+    background: linear-gradient(135deg, var(--primary-gradient-start) 0%, var(--primary-gradient-end) 100%);
+    color: white !important;
+    border: none;
+    box-shadow: 0 4px 12px rgba(102, 102, 255, 0.3); /* Shadow consistent with primary color */
+    font-weight: 600; /* Add font-weight for active state */
+}
+
+.nav-pills .nav-link {
+    color: var(--primary-color); /* Emphasized color */
+    margin: 0 10px;
+    font-weight: 500;
+    transition: all 0.3s ease;
+}
+
+.nav-pills .nav-link:hover {
+    background: linear-gradient(135deg, rgba(170, 169, 255, 0.2) 0%, rgba(181, 213, 255, 0.2) 100%); /* Light gradient transparent hover */
+    color: var(--primary-dark); /* Darker primary on hover */
+}
+
+/* 增加主体内容的边距 */
+.container-fluid {
+    padding-left: 2rem;
+    padding-right: 2rem;
+}
+
+@media (max-width: 768px) {
+    .container-fluid {
+        padding-left: 1rem;
+        padding-right: 1rem;
+    }
+}
+
+/* 确保卡片标题样式一致 */
+.card-title {
+    font-size: 1.25rem;
+    font-weight: 600;
+}
+
+
+/* Upload area styling */
+.upload-area {
+    cursor: pointer;
+    transition: all 0.3s ease;
+    border-color: var(--gray-300) !important; /* Default border color */
+    border-radius: 0.75rem; /* Slightly larger border-radius for softer look */
+    background-color: var(--white); /* Explicitly set white background */
+}
+
+.upload-area:hover {
+    background-color: rgba(102, 102, 255, 0.05); /* Transparent primary color hover */
+    border-color: var(--primary-color) !important; /* Primary color border on hover */
+    box-shadow: 0 2px 8px rgba(102, 102, 255, 0.1); /* Subtle shadow on hover */
+}
+
+.upload-area.dragover {
+    background-color: rgba(102, 102, 255, 0.1); /* Slightly more transparent primary color on dragover */
+    border-color: var(--primary-color) !important; /* Primary color border on dragover */
+    box-shadow: 0 4px 16px rgba(102, 102, 255, 0.15); /* More pronounced shadow on dragover */
+}
+
+.upload-area .bi-cloud-upload {
+    color: var(--primary-color) !important; /* Icon color consistent with primary */
+}
+
+/* Custom class for gradient buttons, consistent with previous page */
+.btn-gradient-primary {
+    background: linear-gradient(135deg, var(--primary-gradient-start) 0%, var(--primary-gradient-end) 100%) !important;
+    color: white !important;
+    border: none !important;
+    font-weight: 600 !important;
+    padding: 0.625rem 1.5rem !important; /* Consistent padding */
+    border-radius: 0.5rem !important; /* Consistent border-radius */
+    transition: all 0.3s ease !important;
+    box-shadow: 0 4px 12px rgba(102, 102, 255, 0.3) !important; /* Consistent shadow */
+}
+
+.btn-gradient-primary:hover {
+    transform: translateY(-2px) !important;
+    box-shadow: 0 8px 24px rgba(102, 102, 255, 0.4) !important;
+    background: linear-gradient(135deg, var(--primary-dark) 0%, var(--primary-color) 100%) !important; /* Slightly adjusted hover gradient for depth */
+}
+
+/* Table styling */
+.table {
+    border-collapse: separate; /* Allows border-radius on table */
+    border-spacing: 0;
+    border-radius: 0.75rem; /* Soften table corners */
+    overflow: hidden; /* Ensures border-radius is visible */
+    box-shadow: var(--shadow-sm); /* Subtle shadow for the table */
+}
+
+.table-responsive {
+    border-radius: 0.75rem; /* Apply border-radius to responsive container too */
+    overflow: hidden; /* Needed for inner table's border-radius */
+}
+
+.table-light {
+    background-color: var(--gray-100) !important; /* Light gray for table header */
+}
+
+.table thead th {
+    color: var(--gray-600); /* Darker text for table headers */
+    font-weight: 600;
+    padding: 0.75rem 1.25rem; /* Adjust padding */
+}
+
+.table tbody td {
+    color: var(--gray-700); /* Main text color for table cells */
+    padding: 0.75rem 1.25rem; /* Adjust padding */
+    vertical-align: middle;
+}
+
+.table-hover tbody tr:hover {
+    background-color: rgba(102, 102, 255, 0.05); /* Light hover effect for table rows */
+}
+
+.table .bi-file-earmark-spreadsheet {
+    color: var(--primary-color) !important; /* Icon color consistent with primary */
+}
+
+/* Outline buttons */
+.btn-outline-primary {
+    color: var(--primary-color);
+    border-color: var(--primary-color);
+    transition: all 0.2s ease;
+}
+
+.btn-outline-primary:hover {
+    background-color: var(--primary-color);
+    color: var(--white) !important;
+    box-shadow: var(--shadow-sm);
+    transform: translateY(-1px);
+}
+
+.btn-outline-danger {
+    color: #FF6B6B; /* Consistent delete red from previous page's delete button */
+    border-color: #FF6B6B;
+    transition: all 0.2s ease;
+}
+
+.btn-outline-danger:hover {
+    background-color: #FF6B6B;
+    color: var(--white) !important;
+    box-shadow: var(--shadow-sm);
+    transform: translateY(-1px);
+}
+
+/* Alert styling within modal */
+.alert-info {
+    background-color: var(--primary-lighter); /* Use light primary for info alerts */
+    border-color: var(--primary-light);
+    color: var(--primary-dark);
+    font-weight: 500;
+    border-radius: 0.5rem;
+}
+
+.alert-info .bi-file-earmark-text {
+    color: var(--primary-dark); /* Icon color for info alert */
+}
+
+/* Placeholder for loading/empty state */
+.text-muted {
+    color: var(--gray-500) !important;
+}
+
+/* Card styling */
+.card {
+    border-radius: 0.75rem !important; /* Consistent card border-radius */
+    box-shadow: var(--shadow) !important; /* Consistent card shadow */
+    border: 1px solid var(--gray-200) !important; /* Light border for cards */
+}
+</style>
+
+
+<script>
+// 页面加载时获取测评集列表
+document.addEventListener('DOMContentLoaded', function() {
+    loadDatasets();
+    initUploadArea();
+
+    // 设置表单提交处理
+    document.getElementById('uploadDatasetForm').addEventListener('submit', handleUploadDataset);
+
+    // 文件选择监听
+    document.getElementById('datasetFile').addEventListener('change', handleFileSelect);
+});
+
+// 初始化上传区域
+function initUploadArea() {
+    const uploadArea = document.getElementById('uploadArea');
+    const fileInput = document.getElementById('datasetFile');
+
+    // 拖拽事件处理
+    uploadArea.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        uploadArea.classList.add('dragover');
+    });
+
+    uploadArea.addEventListener('dragleave', (e) => {
+        e.preventDefault();
+        uploadArea.classList.remove('dragover');
+    });
+
+    uploadArea.addEventListener('drop', (e) => {
+        e.preventDefault();
+        uploadArea.classList.remove('dragover');
+
+        const files = e.dataTransfer.files;
+        if (files.length > 0) {
+            fileInput.files = files;
+            handleFileSelect();
+        }
+    });
+
+    // 点击上传区域
+    uploadArea.addEventListener('click', () => {
+        fileInput.click();
+    });
+}
+
+// 处理文件选择
+function handleFileSelect() {
+    const fileInput = document.getElementById('datasetFile');
+    const fileInfo = document.getElementById('fileInfo');
+    const fileName = document.getElementById('fileName');
+    const fileSize = document.getElementById('fileSize');
+    const uploadBtn = document.getElementById('uploadBtn');
+
+    if (fileInput.files.length > 0) {
+        const file = fileInput.files[0];
+
+        // 检查文件类型
+        if (!file.name.toLowerCase().endsWith('.csv') && !file.name.toLowerCase().endsWith('.xlsx')) {
+            showAlert('只支持 .csv 和 .xlsx 格式的文件', 'warning');
+            fileInput.value = '';
+            return;
+        }
+
+        // 显示文件信息
+        fileName.textContent = `名称: ${file.name}`;
+        fileSize.textContent = `大小: ${formatFileSize(file.size)}`;
+        fileInfo.style.display = 'block';
+        uploadBtn.disabled = false;
+    } else {
+        fileInfo.style.display = 'none';
+        uploadBtn.disabled = true;
+    }
+}
+
+// 加载测评集列表
+async function loadDatasets() {
+    try {
+        const response = await fetch('/web/api/llm/datasets');
+        const result = await response.json();
+
+        if (result.status === 'success') {
+            renderDatasets(result.data);
+        } else {
+            showAlert('获取测评集列表失败', 'danger');
+        }
+    } catch (error) {
+        console.error('加载测评集列表失败:', error);
+        showAlert('加载测评集列表失败', 'danger');
+    }
+}
+
+// 渲染测评集表格
+function renderDatasets(datasets) {
+    const tbody = document.getElementById('datasetsTableBody');
+
+    if (datasets.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="4" class="text-center text-muted">
+                    <i class="bi bi-inbox"></i> 暂无测评集
+                </td>
+            </tr>
+        `;
+        return;
+    }
+
+    tbody.innerHTML = datasets.map(dataset => `
+        <tr>
+            <td>
+                <i class="bi bi-file-earmark-spreadsheet text-primary me-2"></i>
+                ${dataset.name}
+            </td>
+            <td>${formatFileSize(dataset.size)}</td>
+            <td>${new Date(dataset.modified_time).toLocaleString()}</td>
+            <td>
+                <button class="btn btn-sm btn-outline-primary me-2" onclick="downloadDataset('${dataset.name}')">
+                    <i class="bi bi-download"></i> 下载
+                </button>
+                <button class="btn btn-sm btn-outline-danger" onclick="deleteDataset('${dataset.name}')">
+                    <i class="bi bi-trash"></i> 删除
+                </button>
+            </td>
+        </tr>
+    `).join('');
+}
+
+// 显示上传弹窗
+function showUploadModal() {
+    const modal = new bootstrap.Modal(document.getElementById('uploadDatasetModal'));
+    modal.show();
+}
+
+// 处理上传测评集
+async function handleUploadDataset(event) {
+    event.preventDefault();
+
+    const formData = new FormData();
+    const fileInput = document.getElementById('datasetFile');
+
+    if (!fileInput.files.length) {
+        showAlert('请选择要上传的文件', 'warning');
+        return;
+    }
+
+    formData.append('file', fileInput.files[0]);
+
+    const uploadBtn = document.getElementById('uploadBtn');
+    const originalText = uploadBtn.textContent;
+    uploadBtn.disabled = true;
+    uploadBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> 上传中...';
+
+    try {
+        const response = await fetch('/web/api/llm/datasets/upload', {
+            method: 'POST',
+            body: formData
+        });
+
+        const result = await response.json();
+
+        if (result.status === 'success') {
+            showAlert('测评集上传成功', 'success');
+            bootstrap.Modal.getInstance(document.getElementById('uploadDatasetModal')).hide();
+            document.getElementById('uploadDatasetForm').reset();
+            document.getElementById('fileInfo').style.display = 'none';
+            loadDatasets(); // 重新加载列表
+        } else {
+            showAlert(result.message || '上传失败', 'danger');
+        }
+    } catch (error) {
+        console.error('上传测评集失败:', error);
+        showAlert('上传失败', 'danger');
+    } finally {
+        uploadBtn.disabled = false;
+        uploadBtn.textContent = originalText;
+    }
+}
+
+// 下载测评集
+function downloadDataset(filename) {
+    window.open(`/web/api/llm/datasets/${encodeURIComponent(filename)}/download`, '_blank');
+}
+
+// 删除测评集
+async function deleteDataset(filename) {
+    if (!confirm(`确定要删除测评集"${filename}"吗？`)) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`/web/api/llm/datasets/${encodeURIComponent(filename)}`, {
+            method: 'DELETE'
+        });
+
+        const result = await response.json();
+
+        if (result.status === 'success') {
+            showAlert('测评集删除成功', 'success');
+            loadDatasets(); // 重新加载列表
+        } else {
+            showAlert(result.message || '删除失败', 'danger');
+        }
+    } catch (error) {
+        console.error('删除测评集失败:', error);
+        showAlert('删除失败', 'danger');
+    }
+}
+
+// 格式化文件大小
+function formatFileSize(bytes) {
+    if (bytes === 0) return '0 Bytes';
+
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+}
+
+// 显示提示消息
+function showAlert(message, type) {
+    const alert = document.createElement('div');
+    alert.className = `alert alert-${type} alert-dismissible fade show position-fixed`;
+    alert.style.cssText = 'top: 20px; right: 20px; z-index: 9999; min-width: 300px;';
+    alert.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+
+    document.body.appendChild(alert);
+
+    setTimeout(() => {
+        if (alert.parentNode) {
+            alert.parentNode.removeChild(alert);
+        }
+    }, 3000);
+}
+</script>
+{% endblock %}

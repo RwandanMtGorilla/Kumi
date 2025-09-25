@@ -1,0 +1,671 @@
+{% extends "base.html" %}
+
+{% block title %}知识库管理 - Kumi{% endblock %}
+
+{% block content %}
+<style>
+    /* 确保样式优先级 */
+    .knowledge-dashboard {
+        width: 100%;
+        padding: 0 3rem; /* 增加左右边距 */
+        max-width: 1400px;
+        margin: 0 auto;
+    }
+
+    .knowledge-dashboard .knowledge-header {
+        margin-bottom: 3rem;
+    }
+
+    .knowledge-dashboard .knowledge-header h1 {
+        color: #404040 !important;
+        font-weight: 300 !important;
+        margin-bottom: 0.5rem !important;
+    }
+
+    .knowledge-dashboard .cards-grid {
+        display: grid !important;
+        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)) !important;
+        gap: 2rem !important; /* 减小卡片间距 */
+        margin-bottom: 2rem !important;
+    }
+
+    .knowledge-dashboard .knowledge-card {
+        background: #ffffff !important;
+        border-radius: 12px !important;
+        box-shadow: 0 2px 8px rgba(102, 71, 169, 0.1) !important; /* 使用深色渐变起始色的透明版本 */
+        /* 移除 overflow: hidden - 这是关键！ */
+        transition: all 0.3s ease !important;
+        border: 1px solid #e5e7eb !important;
+        aspect-ratio: 16/9 !important;
+        position: relative !important;
+        cursor: pointer !important;
+        z-index: 1 !important; /* 设置卡片的基础层级 */
+    }
+
+    .knowledge-dashboard .knowledge-card:hover {
+        transform: translateY(-2px) !important;
+        box-shadow: 0 4px 16px rgba(102, 71, 169, 0.15) !important; /* hover时使用更深的阴影 */
+        z-index: 2 !important; /* hover时提高层级，但不影响菜单 */
+    }
+
+    /* 功能卡片样式 - 保持overflow hidden，因为它有渐变背景需要裁剪 */
+    .knowledge-dashboard .function-card {
+        display: flex !important;
+        background: linear-gradient(135deg, #6647A9 0%, #5553FF 100%) !important; /* 深色渐变 */
+        color: #ffffff !important;
+        overflow: hidden !important; /* 功能卡片保持裁剪 */
+    }
+
+    .knowledge-dashboard .function-card .function-item {
+        flex: 1 !important;
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: center !important;
+        justify-content: center !important;
+        cursor: pointer !important;
+        transition: all 0.3s ease !important;
+        position: relative !important;
+        padding: 1rem !important;
+    }
+
+    .knowledge-dashboard .function-card .function-item:hover {
+        background-color: rgba(255, 255, 255, 0.1) !important;
+    }
+
+    .knowledge-dashboard .function-card .function-item:first-child {
+        border-right: 1px solid rgba(255, 255, 255, 0.2) !important;
+    }
+
+    .knowledge-dashboard .function-item .icon {
+        font-size: 2.5rem !important;
+        margin-bottom: 0.5rem !important;
+    }
+
+    .knowledge-dashboard .function-item .title {
+        font-size: 1.1rem !important;
+        font-weight: 600 !important;
+        margin-bottom: 0 !important;
+    }
+
+    /* 知识库卡片样式 */
+    .knowledge-dashboard .collection-card {
+        background: #ffffff !important;
+        display: flex !important;
+        flex-direction: column !important;
+        position: relative !important;
+    }
+
+    /* 卡片内容区域 - 添加圆角和背景来模拟裁剪效果 */
+    .knowledge-dashboard .collection-card .card-content {
+        flex: 1 !important;
+        padding: 1.5rem !important;
+        display: flex !important;
+        align-items: flex-start !important;
+        gap: 1rem !important;
+        background: #ffffff !important; /* 确保背景是白色 */
+        border-radius: 12px !important; /* 圆角 */
+        position: relative !important;
+        z-index: 1 !important; /* 确保在底层 */
+    }
+
+    .knowledge-dashboard .collection-card .card-icon {
+        font-size: 1.8rem !important;
+        color: #6666FF !important; /* 强调色 */
+        flex-shrink: 0 !important;
+        margin-top: 0.2rem !important;
+    }
+
+    .knowledge-dashboard .collection-card .card-text {
+        flex: 1 !important;
+        min-width: 0 !important;
+    }
+
+    .knowledge-dashboard .collection-card .card-title {
+        font-size: 1.1rem !important;
+        font-weight: 600 !important;
+        color: #404040 !important; /* 文字色 */
+        margin-bottom: 0.3rem !important;
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+    }
+
+    .knowledge-dashboard .collection-card .card-subtitle {
+        font-size: 0.8rem !important;
+        color: #6b7280 !important; /* 次要文字色 */
+        font-family: 'Courier New', monospace !important;
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+    }
+
+    /* 底部操作区域 - 触发区域 */
+    .knowledge-dashboard .collection-card .bottom-area {
+        position: absolute !important;
+        bottom: 0 !important;
+        left: 0 !important;
+        right: 0 !important;
+        height: 40% !important; /* 底部40%区域 */
+        pointer-events: none !important;
+        border-radius: 0 0 12px 12px !important; /* 底部圆角 */
+    }
+
+    /* 三点图标按钮 */
+    .knowledge-dashboard .collection-card .more-btn {
+        position: absolute !important;
+        bottom: 0.75rem !important;
+        right: 0.75rem !important;
+        background: rgba(108, 117, 125, 0.8) !important;
+        border: none !important;
+        color: #ffffff !important;
+        border-radius: 50% !important;
+        width: 2rem !important;
+        height: 2rem !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        cursor: pointer !important;
+        opacity: 0 !important;
+        visibility: hidden !important;
+        transition: all 0.2s ease !important; /* 加快按钮动画 */
+        z-index: 15 !important;
+        pointer-events: auto !important;
+    }
+
+    .knowledge-dashboard .collection-card:hover .more-btn {
+        opacity: 1 !important;
+        visibility: visible !important;
+    }
+
+    .knowledge-dashboard .collection-card .more-btn:hover {
+        background: rgba(102, 102, 255, 0.9) !important; /* hover时使用强调色 */
+        transform: scale(1.1) !important;
+    }
+
+    /* 操作菜单容器 - 现在可以正常显示在卡片外部 */
+    .knowledge-dashboard .menu-container {
+        position: absolute !important;
+        top: 100% !important; /* 位于卡片下方 */
+        right: 0 !important; /* 右侧对齐 */
+        z-index: 100 !important; /* 大幅提高z-index，确保在所有卡片之上 */
+        pointer-events: none !important; /* 默认不捕获事件 */
+    }
+
+    .knowledge-dashboard .menu-container.active {
+        pointer-events: auto !important; /* 激活时捕获事件 */
+    }
+
+    /* 删除菜单 - 现在应该能正常显示且不被遮挡 */
+    .knowledge-dashboard .delete-menu {
+        background: #ffffff !important;
+        border: 1px solid #e5e7eb !important;
+        border-radius: 6px !important;
+        box-shadow: 0 8px 24px rgba(102, 71, 169, 0.15) !important; /* 使用深色渐变色的透明版本 */
+        padding: 0.25rem !important;
+        opacity: 0 !important;
+        visibility: hidden !important;
+        transform: translateY(-0.3rem) scale(0.95) !important; /* 减小位移量 */
+        transition: all 0.15s ease !important; /* 加快动画速度：0.3s -> 0.15s */
+        white-space: nowrap !important;
+        min-width: 120px !important;
+        margin-top: 0.5rem !important; /* 与卡片之间的间距 */
+        z-index: 101 !important; /* 确保菜单在最顶层 */
+    }
+
+    .knowledge-dashboard .delete-menu.show {
+        opacity: 1 !important;
+        visibility: visible !important;
+        transform: translateY(0) scale(1) !important;
+    }
+
+    .knowledge-dashboard .delete-menu .menu-btn {
+        background: none !important;
+        border: none !important;
+        font-size: 0.85rem !important;
+        cursor: pointer !important;
+        padding: 0.5rem 0.75rem !important;
+        border-radius: 4px !important;
+        transition: background-color 0.15s ease !important; /* 加快按钮hover动画 */
+        display: flex !important;
+        align-items: center !important;
+        gap: 0.5rem !important;
+        width: 100% !important;
+        text-align: left !important;
+        color: #404040 !important; /* 统一文字色 */
+    }
+
+    .knowledge-dashboard .delete-menu .menu-btn:hover {
+        background-color: #f9fafb !important; /* 浅色背景 */
+    }
+
+    .knowledge-dashboard .delete-menu .copy-btn {
+        color: #6666FF !important; /* 强调色 */
+        border-bottom: 1px solid #e5e7eb !important;
+    }
+
+    .knowledge-dashboard .delete-menu .copy-btn:hover {
+        background: linear-gradient(135deg, #AAA9FF 0%, #B5D5FF 100%) !important; /* 浅色渐变背景 */
+        color: #404040 !important;
+    }
+
+    .knowledge-dashboard .delete-menu .delete-btn {
+        color: #dc2626 !important; /* 保持删除按钮红色 */
+    }
+
+    .knowledge-dashboard .delete-menu .delete-btn:hover {
+        background-color: #fef2f2 !important; /* 红色浅背景 */
+    }
+
+    /* 复制成功提示 */
+    .knowledge-dashboard .copy-toast {
+        position: fixed !important;
+        top: 20px !important;
+        right: 20px !important;
+        background: #6666FF !important; /* 强调色背景 */
+        color: #ffffff !important;
+        padding: 0.75rem 1rem !important;
+        border-radius: 6px !important;
+        box-shadow: 0 2px 8px rgba(102, 102, 255, 0.3) !important; /* 强调色阴影 */
+        opacity: 0 !important;
+        transform: translateX(100%) !important;
+        transition: all 0.3s ease !important;
+        z-index: 9999 !important;
+        font-size: 0.9rem !important;
+    }
+
+    .knowledge-dashboard .copy-toast.show {
+        opacity: 1 !important;
+        transform: translateX(0) !important;
+    }
+
+    .knowledge-dashboard .knowledge-loading-state {
+        text-align: center !important;
+        padding: 3rem !important;
+        color: #6b7280 !important; /* 次要文字色 */
+    }
+
+    .knowledge-dashboard .knowledge-loading-state .spinner-border {
+        margin-bottom: 1rem !important;
+        border-color: #e5e7eb !important;
+        border-top-color: #6666FF !important; /* 强调色 */
+    }
+
+    .knowledge-dashboard .knowledge-error-state {
+        background-color: #fef2f2 !important;
+        color: #dc2626 !important;
+        padding: 1rem !important;
+        border-radius: 8px !important;
+        margin: 1rem 0 !important;
+        border: 1px solid #fecaca !important;
+    }
+
+    .knowledge-dashboard .knowledge-empty-state {
+        text-align: center !important;
+        padding: 3rem !important;
+        color: #6b7280 !important; /* 次要文字色 */
+    }
+
+    .knowledge-dashboard .knowledge-empty-state .icon {
+        font-size: 4rem !important;
+        color: #d1d5db !important; /* 浅灰色 */
+        margin-bottom: 1rem !important;
+    }
+
+    .knowledge-dashboard .knowledge-empty-state h3 {
+        color: #404040 !important; /* 文字色 */
+        margin-bottom: 1rem !important;
+    }
+
+    .knowledge-dashboard .knowledge-empty-state .btn-primary {
+        background: linear-gradient(135deg, #6647A9 0%, #5553FF 100%) !important; /* 深色渐变 */
+        border: none !important;
+        color: #ffffff !important;
+        font-weight: 600 !important;
+        padding: 0.75rem 1.5rem !important;
+        border-radius: 8px !important;
+        transition: all 0.3s ease !important;
+    }
+
+    .knowledge-dashboard .knowledge-empty-state .btn-primary:hover {
+        background: linear-gradient(135deg, #5553FF 0%, #6647A9 100%) !important; /* 反向渐变 */
+        transform: translateY(-1px) !important;
+        box-shadow: 0 4px 12px rgba(102, 71, 169, 0.3) !important;
+    }
+
+    /* 响应式设计 */
+    @media (max-width: 768px) {
+        .knowledge-dashboard {
+            padding: 0 1.5rem !important;
+        }
+
+        .knowledge-dashboard .cards-grid {
+            grid-template-columns: 1fr !important;
+            gap: 1.5rem !important;
+        }
+
+        .knowledge-dashboard .function-card {
+            flex-direction: column !important;
+            aspect-ratio: 1/1 !important;
+        }
+
+        .knowledge-dashboard .function-card .function-item:first-child {
+            border-right: none !important;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2) !important;
+        }
+
+        .knowledge-dashboard .function-item .icon {
+            font-size: 2rem !important;
+        }
+
+        .knowledge-dashboard .function-item .title {
+            font-size: 1rem !important;
+        }
+    }
+</style>
+
+
+<div class="knowledge-dashboard">
+
+
+
+    <div id="cardsContainer" class="cards-grid" style="display: none;">
+        <!-- 功能卡片 -->
+        <div class="knowledge-card function-card">
+            <div class="function-item" onclick="navigateToUpload()">
+                <div class="icon"><i class="bi bi-cloud-upload"></i></div>
+                <div class="title">知识库上传</div>
+            </div>
+            <div class="function-item" onclick="navigateToTest()">
+                <div class="icon"><i class="bi bi-gear"></i></div>
+                <div class="title">知识库测试</div>
+            </div>
+        </div>
+
+        <!-- 知识库卡片将通过 JavaScript 动态生成 -->
+    </div>
+
+    <div id="loadingState" class="knowledge-loading-state">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+        <div>正在加载知识库...</div>
+    </div>
+
+    <div id="errorState" class="knowledge-error-state" style="display: none;">
+        <i class="bi bi-exclamation-triangle me-2"></i>
+        <span id="errorMessage"></span>
+    </div>
+
+    <div id="emptyState" class="knowledge-empty-state" style="display: none;">
+        <div class="icon"><i class="bi bi-inbox"></i></div>
+        <h3>暂无知识库</h3>
+        <button class="btn btn-primary mt-2" onclick="navigateToUpload()">
+            <i class="bi bi-cloud-upload me-2"></i>创建知识库
+        </button>
+    </div>
+
+    <!-- 复制成功提示 -->
+    <div id="copyToast" class="copy-toast">
+        <i class="bi bi-check-circle me-2"></i>
+        <span>库名已复制到剪贴板</span>
+    </div>
+</div>
+
+<script>
+    // 页面加载时获取知识库列表
+    document.addEventListener('DOMContentLoaded', function() {
+        loadKnowledgeBases();
+    });
+
+    // 加载知识库列表
+    async function loadKnowledgeBases() {
+        try {
+            const response = await fetch('/web/api/knowledge/collections');
+            const result = await response.json();
+
+            hideLoading();
+
+            if (result.status === 'success') {
+                displayKnowledgeBases(result.data.collections);
+            } else {
+                showError('加载知识库失败: ' + result.message);
+            }
+        } catch (error) {
+            hideLoading();
+            showError('网络错误: ' + error.message);
+        }
+    }
+
+    // 显示知识库列表
+    function displayKnowledgeBases(collections) {
+        const container = document.getElementById('cardsContainer');
+        const emptyState = document.getElementById('emptyState');
+
+        if (collections.length === 0) {
+            container.style.display = 'none';
+            emptyState.style.display = 'block';
+            return;
+        }
+
+        container.style.display = 'grid';
+        emptyState.style.display = 'none';
+
+        // 清除现有的知识库卡片（保留功能卡片）
+        const existingCards = container.querySelectorAll('.collection-card');
+        existingCards.forEach(card => card.remove());
+
+        // 添加知识库卡片
+        collections.forEach(collection => {
+            const card = createKnowledgeCard(collection);
+            container.appendChild(card);
+        });
+    }
+
+
+    // 创建知识库卡片
+    function createKnowledgeCard(collection) {
+        const card = document.createElement('div');
+        card.className = 'knowledge-card collection-card';
+
+        card.innerHTML = `
+            <div class="card-content">
+                <div class="card-icon">
+                    <i class="bi bi-journal-bookmark"></i>
+                </div>
+                <div class="card-text">
+                    <div class="card-title" title="${collection.display_name}">${collection.display_name}</div>
+                    <div class="card-subtitle" title="${collection.name}">${collection.name}</div>
+                </div>
+            </div>
+            <div class="bottom-area"></div>
+            <button class="more-btn" data-collection="${collection.name}">
+                <i class="bi bi-three-dots"></i>
+            </button>
+            <div class="menu-container" data-menu="${collection.name}">
+                <div class="delete-menu">
+                    <button class="menu-btn copy-btn" data-action="copy" data-collection="${collection.name}">
+                        <i class="bi bi-copy"></i>
+                        复制库名
+                    </button>
+                    <button class="menu-btn delete-btn" data-action="delete" data-collection="${collection.name}" data-display-name="${collection.display_name}">
+                        <i class="bi bi-trash"></i>
+                        删除知识库
+                    </button>
+                </div>
+            </div>
+        `;
+
+        // 设置事件监听
+        setupCardEvents(card, collection);
+
+        return card;
+    }
+
+    // 设置卡片事件
+    function setupCardEvents(card, collection) {
+        const moreBtn = card.querySelector('.more-btn');
+        const menuContainer = card.querySelector('.menu-container');
+        const deleteMenu = card.querySelector('.delete-menu');
+
+        // 卡片点击事件（排除操作按钮区域）
+        card.addEventListener('click', function(e) {
+            if (!e.target.closest('.more-btn') && !e.target.closest('.menu-container')) {
+                testKnowledge(collection.name);
+            }
+        });
+
+        // 三点按钮点击事件
+        moreBtn.addEventListener('click', function(e) {
+            e.stopPropagation();
+            toggleMenu(menuContainer, deleteMenu);
+        });
+
+        // 菜单按钮点击事件
+        card.querySelectorAll('.menu-btn').forEach(btn => {
+            btn.addEventListener('click', function(e) {
+                e.stopPropagation();
+                const action = this.dataset.action;
+                const collectionName = this.dataset.collection;
+
+                if (action === 'copy') {
+                    copyCollectionName(collectionName);
+                } else if (action === 'delete') {
+                    const displayName = this.dataset.displayName;
+                    deleteKnowledge(collectionName, displayName);
+                }
+            });
+        });
+
+        // 鼠标离开卡片和菜单区域时隐藏菜单
+        let leaveTimer;
+
+        function handleMouseLeave() {
+            leaveTimer = setTimeout(() => {
+                hideMenu(menuContainer, deleteMenu);
+            }, 150); // 稍微减少延迟时间，配合快速动画
+        }
+
+        function handleMouseEnter() {
+            if (leaveTimer) {
+                clearTimeout(leaveTimer);
+            }
+        }
+
+        card.addEventListener('mouseleave', handleMouseLeave);
+        card.addEventListener('mouseenter', handleMouseEnter);
+        menuContainer.addEventListener('mouseleave', handleMouseLeave);
+        menuContainer.addEventListener('mouseenter', handleMouseEnter);
+    }
+
+    // 切换菜单显示
+    function toggleMenu(menuContainer, deleteMenu) {
+        // 先隐藏其他所有菜单
+        document.querySelectorAll('.menu-container').forEach(container => {
+            if (container !== menuContainer) {
+                container.classList.remove('active');
+                container.querySelector('.delete-menu').classList.remove('show');
+            }
+        });
+
+        // 切换当前菜单
+        const isShowing = deleteMenu.classList.contains('show');
+        if (isShowing) {
+            hideMenu(menuContainer, deleteMenu);
+        } else {
+            showMenu(menuContainer, deleteMenu);
+        }
+    }
+
+    // 显示菜单
+    function showMenu(menuContainer, deleteMenu) {
+        menuContainer.classList.add('active');
+        deleteMenu.classList.add('show');
+    }
+
+    // 隐藏菜单
+    function hideMenu(menuContainer, deleteMenu) {
+        menuContainer.classList.remove('active');
+        deleteMenu.classList.remove('show');
+    }
+
+    // 复制知识库名称
+    async function copyCollectionName(collectionName) {
+        try {
+            await navigator.clipboard.writeText(collectionName);
+            showCopyToast();
+        } catch (error) {
+            // 如果剪贴板API不可用，使用传统方法
+            const textArea = document.createElement('textarea');
+            textArea.value = collectionName;
+            document.body.appendChild(textArea);
+            textArea.select();
+            document.execCommand('copy');
+            document.body.removeChild(textArea);
+            showCopyToast();
+        }
+
+        // 隐藏菜单
+        document.querySelectorAll('.menu-container').forEach(container => {
+            container.classList.remove('active');
+            container.querySelector('.delete-menu').classList.remove('show');
+        });
+    }
+
+    // 显示复制成功提示
+    function showCopyToast() {
+        const toast = document.getElementById('copyToast');
+        toast.classList.add('show');
+
+        setTimeout(() => {
+            toast.classList.remove('show');
+        }, 2000);
+    }
+
+    // 导航函数
+    function navigateToUpload() {
+        window.location.href = '/web/knowledge/upload';
+    }
+
+    function navigateToTest() {
+        window.location.href = '/web/knowledge/test';
+    }
+
+    function testKnowledge(collectionName) {
+        window.location.href = `/web/knowledge/test?collection=${encodeURIComponent(collectionName)}`;
+    }
+
+    // 删除知识库
+    async function deleteKnowledge(collectionName, displayName) {
+        if (!confirm(`确定要删除知识库 "${displayName}" 吗？\n\n此操作不可撤销，将永久删除所有相关数据。`)) {
+            return;
+        }
+
+        try {
+            const response = await fetch(`/web/api/knowledge/collections/${encodeURIComponent(collectionName)}`, {
+                method: 'DELETE'
+            });
+
+            const result = await response.json();
+
+            if (result.status === 'success') {
+                alert('知识库删除成功！');
+                loadKnowledgeBases(); // 重新加载列表
+            } else {
+                alert('删除失败: ' + result.message);
+            }
+        } catch (error) {
+            alert('删除失败: ' + error.message);
+        }
+    }
+
+    // 工具函数
+    function hideLoading() {
+        document.getElementById('loadingState').style.display = 'none';
+    }
+
+    function showError(message) {
+        document.getElementById('errorMessage').textContent = message;
+        document.getElementById('errorState').style.display = 'block';
+    }
+</script>
+{% endblock %}

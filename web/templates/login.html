@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>登录 - Kumi</title>
+    <link href="/static/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        /* 基础样式变量 */
+        :root {
+            --kumi-primary-color: #6666FF;
+            --kumi-primary-dark: #5553FF;
+            --kumi-primary-light: #7777FF;
+            --kumi-primary-lighter: #E6E6FF;
+            --kumi-gradient-start: #6647A9;
+            --kumi-gradient-end: #5553FF;
+            --kumi-text-color: #404040;
+            --kumi-text-light: #666666;
+            --kumi-white: #ffffff;
+            --kumi-gray-100: #f5f5f5;
+            --kumi-gray-200: #e8e8e8;
+            --kumi-gray-300: #d4d4d4;
+            --kumi-gray-500: #808080;
+            --kumi-shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+        }
+
+        html, body {
+            width: 100%;
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            overflow-x: hidden;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: var(--kumi-text-color);
+            line-height: 1.6;
+        }
+
+        /* 彩球背景容器 */
+        .kumi-background-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image: linear-gradient(to right, #6647A9, #5553FF);
+            z-index: -1;
+        }
+
+        /* 毛玻璃效果相关样式 */
+        .glass-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        .glass-overlay::before {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 0;
+            bottom: 0;
+            right: 0;
+            backdrop-filter: blur(30px);
+            z-index: 1;
+            pointer-events: none;
+        }
+
+        /* 毛玻璃装饰层 */
+        .glass-decoration {
+            position: absolute;
+            border-radius: 50%;
+            opacity: 0.1;
+            pointer-events: none;
+        }
+
+        .glass-decoration-1 {
+            top: 20%;
+            left: 15%;
+            width: 300px;
+            height: 300px;
+            background: radial-gradient(circle, rgba(255,255,255,0.3) 0%, transparent 70%);
+        }
+
+        .glass-decoration-2 {
+            top: 60%;
+            right: 20%;
+            width: 200px;
+            height: 200px;
+            background: radial-gradient(circle, rgba(255,255,255,0.2) 0%, transparent 70%);
+        }
+
+        .glass-decoration-3 {
+            bottom: 30%;
+            left: 30%;
+            width: 150px;
+            height: 150px;
+            background: radial-gradient(circle, rgba(255,255,255,0.15) 0%, transparent 70%);
+        }
+
+        /* 登录页面样式 */
+        .kumi-login-body {
+            min-height: 100vh;
+            background: transparent;
+        }
+
+        /* 登录容器 */
+        .kumi-login-container {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 20px;
+            position: relative;
+            z-index: 20;
+        }
+
+        .kumi-login-card-wrapper {
+            width: 100%;
+            max-width: 400px;
+            min-width: 320px;
+        }
+
+        .kumi-login-card {
+            background-color: rgba(255, 255, 255, 0.95);
+            border-radius: 1rem;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            width: 100%;
+        }
+
+        .kumi-login-card-body {
+            padding: 2.5rem;
+        }
+
+        /* 品牌样式 */
+        .kumi-brand-logo {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+
+        .kumi-brand-logo img {
+            height: 60px;
+            margin-bottom: 1rem;
+        }
+
+        .kumi-brand-text {
+            font-weight: 700;
+            font-size: 1.5rem;
+            background: linear-gradient(135deg, var(--kumi-gradient-start), var(--kumi-gradient-end));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin: 0;
+        }
+
+        .kumi-brand-subtitle {
+            color: var(--kumi-text-light);
+            margin: 0.5rem 0 0 0;
+            font-size: 0.9rem;
+        }
+
+        /* 表单样式 */
+        .kumi-form-group {
+            margin-bottom: 1.5rem; /* 你想要的普通间距 */
+        }
+
+        .kumi-form-group:last-of-type {
+            margin-bottom: 2.5rem; /* 最后一个 form-group 间距加大 */
+        }
+
+
+        .kumi-form-label {
+            font-weight: 600;
+            color: var(--kumi-text-color);
+            margin-bottom: 0.5rem;
+            display: block;
+        }
+
+        .kumi-form-control {
+            width: 100%;
+            padding: 0.875rem 1rem;
+            font-size: 1.1rem;
+            border: 1px solid var(--kumi-gray-300);
+            border-radius: 0.5rem;
+            transition: all 0.2s ease;
+            background-color: rgba(255, 255, 255, 0.9);
+            box-sizing: border-box;
+            color: var(--kumi-text-color);
+            backdrop-filter: blur(5px);
+        }
+
+        .kumi-form-control:focus {
+            outline: none;
+            border-color: var(--kumi-primary-color);
+            box-shadow: 0 0 0 3px rgba(102, 102, 255, 0.1);
+            background-color: rgba(255, 255, 255, 0.95);
+        }
+
+        /* 按钮样式 */
+        .kumi-btn-login {
+            width: 100% !important;
+            background: linear-gradient(135deg, var(--kumi-primary-color), var(--kumi-primary-dark));
+            border: 1px solid var(--kumi-primary-color);
+            color: var(--kumi-white);
+            font-weight: 600;
+            padding: 0.875rem 2rem;
+            font-size: 1.1rem;
+            border-radius: 0.5rem;
+            transition: all 0.2s ease;
+            cursor: pointer;
+        }
+
+        .kumi-btn-login:hover {
+            background: linear-gradient(135deg, var(--kumi-primary-dark), var(--kumi-gradient-end));
+            border-color: var(--kumi-primary-dark);
+            transform: translateY(-1px);
+            box-shadow: var(--kumi-shadow-lg);
+        }
+
+        /* 警告框样式 */
+        .kumi-alert {
+            padding: 0.75rem 1rem;
+            margin-bottom: 1.5rem;
+            border-radius: 0.5rem;
+            border: 1px solid;
+        }
+
+        .kumi-alert-danger {
+            background-color: rgba(254, 242, 242, 0.9);
+            border-color: #fecaca;
+            color: #dc2626;
+            backdrop-filter: blur(5px);
+        }
+
+        /* 响应式设计 */
+        @media (max-width: 480px) {
+            .kumi-login-container {
+                padding: 15px;
+            }
+
+            .kumi-login-card-wrapper {
+                min-width: 280px;
+            }
+
+            .kumi-login-card-body {
+                padding: 2rem 1.5rem;
+            }
+
+            .kumi-brand-text {
+                font-size: 1.3rem;
+            }
+
+            .kumi-form-control {
+                padding: 0.75rem 1rem;
+                font-size: 1rem;
+            }
+
+
+        }
+
+        @media (max-width: 320px) {
+            .kumi-login-card-wrapper {
+                min-width: 260px;
+            }
+
+            .kumi-login-card-body {
+                padding: 1.5rem 1rem;
+            }
+        }
+    </style>
+    <script src="/static/js/jquery-3.7.1.min.js"></script>
+</head>
+<body class="kumi-login-body">
+    <!-- 彩球毛玻璃背景容器 -->
+    <div id="jsi-cherry-container" class="kumi-background-container">
+        <div class="glass-overlay">
+            <div class="glass-decoration glass-decoration-1"></div>
+            <div class="glass-decoration glass-decoration-2"></div>
+            <div class="glass-decoration glass-decoration-3"></div>
+        </div>
+    </div>
+
+    <div class="kumi-login-container">
+        <div class="kumi-login-card-wrapper">
+            <div class="kumi-login-card">
+                <div class="kumi-login-card-body">
+                    <div class="kumi-brand-logo">
+                        <img src="/static/images/logo.png" alt="Kumi">
+                        <h3 class="kumi-brand-text">Kumi</h3>
+                        <p class="kumi-brand-subtitle">知识库与大模型评测平台</p>
+                    </div>
+
+                    {% if error %}
+                    <div class="kumi-alert kumi-alert-danger" role="alert">
+                        {{ error }}
+                    </div>
+                    {% endif %}
+
+                    <form method="post" action="/web/login">
+                        <div class="kumi-form-group">
+                            <label for="username" class="kumi-form-label">用户名</label>
+                            <input type="text" class="kumi-form-control" id="username" name="username" required>
+                        </div>
+                        <div class="kumi-form-group">
+                            <label for="password" class="kumi-form-label">密码</label>
+                            <input type="password" class="kumi-form-control" id="password" name="password" required>
+                        </div>
+                        <button type="submit" class="kumi-btn-login">登录</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        var RENDERER = {
+            INIT_CHERRY_BLOSSOM_COUNT: 25,
+            MAX_CHERRY_COUNT: 50,
+            MAX_ADDING_INTERVAL: 3,
+            cherries: [],
+            mouse: { x: 0, y: 0 },
+
+            init: function () {
+                this.setParameters();
+                this.reconstructMethods();
+                this.createCherries();
+                this.bindEvents();
+                this.render();
+            },
+            setParameters: function () {
+                this.$container = $('#jsi-cherry-container');
+                this.width = this.$container.width();
+                this.height = this.$container.height();
+                this.context = $('<canvas />').attr({ width: this.width, height: this.height }).prependTo(this.$container).get(0).getContext('2d');
+                this.maxAddingInterval = Math.round(this.MAX_ADDING_INTERVAL * 1000 / this.width);
+                this.addingInterval = this.maxAddingInterval;
+                this.nextAddingInterval = this.getRandomAddingInterval();
+            },
+            reconstructMethods: function () {
+                this.render = this.render.bind(this);
+                this.onMouseMove = this.onMouseMove.bind(this);
+            },
+            bindEvents: function () {
+                $(window).on('mousemove', this.onMouseMove);
+            },
+            getRandomAddingInterval: function() {
+                return Math.floor(Math.random() * 30) + 5;
+            },
+            createCherries: function () {
+                for (var i = 0, length = Math.round(this.INIT_CHERRY_BLOSSOM_COUNT * this.width / 1000); i < length; i++) {
+                    var cherry = new CHERRY_BLOSSOM(this);
+                    cherry.initAsFullGrownWithRandomLifetime(i, length);
+                    this.cherries.push(cherry);
+                }
+            },
+            onMouseMove: function (e) {
+                this.mouse.x = e.pageX;
+                this.mouse.y = e.pageY;
+            },
+            render: function () {
+                requestAnimationFrame(this.render);
+                this.context.clearRect(0, 0, this.width, this.height);
+
+                this.cherries.sort(function (cherry1, cherry2) {
+                    return cherry1.z - cherry2.z;
+                });
+                for (var i = this.cherries.length - 1; i >= 0; i--) {
+                    if (!this.cherries[i].render(this.context, this.mouse)) {
+                        this.cherries.splice(i, 1);
+                    }
+                }
+
+                if (--this.addingInterval <= 0) {
+                    if (this.cherries.length < this.MAX_CHERRY_COUNT) {
+                        this.cherries.push(new CHERRY_BLOSSOM(this));
+                    }
+                    this.addingInterval = this.nextAddingInterval;
+                    this.nextAddingInterval = this.getRandomAddingInterval();
+                }
+            }
+        };
+
+        var CHERRY_BLOSSOM = function (renderer) {
+            this.renderer = renderer;
+            this.init();
+        };
+        CHERRY_BLOSSOM.prototype = {
+            FOCUS_POSITION: 50,
+            FAR_LIMIT: 1200,
+            init: function () {
+                this.x = this.getRandomValue(-this.renderer.width * 6, this.renderer.width * 10);
+                this.y = this.getRandomValue(-this.renderer.height * 6, this.renderer.height * 10);
+                this.z = this.getRandomValue(300, this.FAR_LIMIT);
+                this.vx = this.getRandomValue(-2, 2);
+                this.vy = this.getRandomValue(-2, 2);
+                this.theta = this.getRandomValue(0, Math.PI * 2);
+                this.phi = this.getRandomValue(0, Math.PI * 2);
+                this.size = this.getRandomValue(85, 205);
+
+                var colors = ['#626CFF', '#6A6DFA', '#726DF6', '#7A6EF1', '#826FEC', '#8A6FE8', '#9270E3'];
+
+                this.color = colors[Math.floor(Math.random() * colors.length)];
+
+                this.currentSize = 0;
+                this.growing = true;
+                this.shrinking = false;
+                this.lifeTime = 0;
+                this.maxLifeTime = this.getRandomValue(1800, 3000);
+            },
+            initAsFullGrownWithRandomLifetime: function(index, totalCount) {
+                this.currentSize = this.size;
+                this.growing = false;
+                this.shrinking = false;
+
+                var baseProgress = (index / totalCount) * 0.8;
+                var randomOffset = this.getRandomValue(-0.15, 0.15);
+                var lifeProgress = Math.max(0, Math.min(0.85, baseProgress + randomOffset));
+
+                this.lifeTime = Math.floor(this.maxLifeTime * lifeProgress);
+
+                if (Math.random() < 0.1) {
+                    this.shrinking = true;
+                    this.lifeTime = this.maxLifeTime + Math.floor(this.getRandomValue(1, 300));
+                    this.currentSize = this.size * this.getRandomValue(0.3, 0.8);
+                }
+            },
+            getRandomValue: function (min, max) {
+                return min + (max - min) * Math.random();
+            },
+            getAxis: function (mouse) {
+                var rate = this.FOCUS_POSITION / (this.z + this.FOCUS_POSITION),
+                    x = this.renderer.width / 2 + (this.x - mouse.x) * rate,
+                    y = this.renderer.height / 2 - (this.y - mouse.y) * rate;
+                return { rate: rate, x: x, y: y };
+            },
+            render: function (context, mouse) {
+                var axis = this.getAxis(mouse);
+
+                this.lifeTime++;
+
+                if (this.growing) {
+                    this.currentSize += this.size / 600;
+                    if (this.currentSize >= this.size) {
+                        this.currentSize = this.size;
+                        this.growing = false;
+                    }
+                }
+
+                if (!this.growing && !this.shrinking && this.lifeTime > this.maxLifeTime) {
+                    this.shrinking = true;
+                }
+
+                if (this.shrinking) {
+                    this.currentSize -= this.size / 600;
+                    if (this.currentSize <= 0) {
+                        this.currentSize = 0;
+                        return false;
+                    }
+                }
+
+                context.save();
+                context.fillStyle = this.color;
+                context.translate(axis.x, axis.y);
+                context.rotate(this.theta);
+                context.scale(axis.rate * this.currentSize, axis.rate * this.currentSize);
+                context.beginPath();
+                context.moveTo(0, 0);
+                context.arc(0, 0, 10, 0, Math.PI * 2, false);
+                context.fill();
+                context.restore();
+
+                this.x += this.vx;
+                this.y += this.vy;
+                this.theta += 0.005;
+
+                return this.z > -this.FOCUS_POSITION && this.z < this.FAR_LIMIT &&
+                       this.x < this.renderer.width * 2.5 && this.x > -this.renderer.width * 1.5 || true;
+            }
+        };
+
+        $(function () {
+            RENDERER.init();
+        });
+    </script>
+</body>
+</html>

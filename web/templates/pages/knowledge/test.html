@@ -1,0 +1,2010 @@
+{% extends "base.html" %}
+
+{% block title %}知识库测试{% endblock %}
+
+{% block content %}
+<style>
+    * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+    }
+
+    .test-container {
+        max-width: 100%;
+        margin: 0;
+        padding: 8px;
+        height: calc(100vh - 60px); /* 减去顶部导航栏高度 */
+        overflow: hidden;
+    }
+
+    .main-layout {
+        display: grid;
+        grid-template-columns: 340px 1fr;
+        gap: 8px;
+        height: 100%;
+    }
+
+    .sidebar {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        overflow-y: auto;
+    }
+
+    .control-panel {
+        background: white;
+        border-radius: 6px;
+        padding: 16px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        border: 1px solid #e9ecef;
+    }
+
+    .control-section {
+        margin-bottom: 16px;
+    }
+
+    .control-section:last-child {
+        margin-bottom: 0;
+    }
+
+    .section-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: #404040;
+    margin-bottom: 10px;
+    padding-bottom: 4px;
+    border-bottom: 1px solid #dee2e6;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+    .control-group {
+        margin-bottom: 12px;
+    }
+
+    .control-group:last-child {
+        margin-bottom: 0;
+    }
+
+    .control-group label {
+    display: block;
+    margin-bottom: 4px;
+    font-weight: 500;
+    color: #404040;
+    font-size: 12px;
+}
+
+.heatmap-controls label {
+    margin-right: 8px;
+    font-size: 12px;
+    font-weight: 500;
+    color: #404040;
+}
+    .control-group select,
+    .control-group input {
+        width: 100%;
+        padding: 8px;
+        border: 1px solid #ced4da;
+        border-radius: 4px;
+        font-size: 12px;
+        transition: border-color 0.2s ease;
+        background: white;
+    }
+
+    .control-group select:focus,
+    .control-group input:focus {
+        outline: none;
+        border-color: #6666FF;
+        box-shadow: 0 0 0 2px rgba(102, 102, 255, 0.1);
+    }
+
+    .control-group select.required-empty,
+    .control-group input.required-empty {
+        border-color: #dc3545;
+        box-shadow: 0 0 0 2px rgba(220, 53, 69, 0.1);
+    }
+
+    .required-error {
+        color: #dc3545;
+        font-size: 11px;
+        margin-top: 4px;
+        display: none;
+    }
+
+    .dual-input-group {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 6px;
+    }
+
+    .btn {
+        width: 100%;
+        padding: 8px 12px;
+        border: none;
+        border-radius: 4px;
+        font-size: 12px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        text-transform: none;
+    }
+
+    .btn:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+    }
+
+    .btn-primary {
+    background: #6666FF;
+    color: white;
+}
+
+.btn-primary:hover:not(:disabled) {
+    background: #5553FF;
+}
+
+    .btn-secondary {
+        background: #6c757d;
+        color: white;
+    }
+
+    .btn-secondary:hover:not(:disabled) {
+        background: #5c636a;
+    }
+
+    .btn-success {
+        background: #198754;
+        color: white;
+    }
+
+    .btn-success:hover:not(:disabled) {
+        background: #157347;
+    }
+
+    .heatmap-main {
+        background: white;
+        border-radius: 6px;
+        padding: 12px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        border: 1px solid #e9ecef;
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+    }
+
+    .heatmap-controls {
+        display: flex;
+        justify-content: flex-start;
+        align-items: center;
+        margin-bottom: 10px;
+        padding-bottom: 8px;
+        border-bottom: 1px solid #e9ecef;
+        flex-shrink: 0;
+    }
+
+    .colorscheme-selector {
+        display: flex;
+        gap: 6px;
+        align-items: center;
+    }
+
+    .colorscheme-btn {
+        width: 28px;
+        height: 18px;
+        border: 2px solid #dee2e6;
+        border-radius: 3px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+
+    .colorscheme-btn.active {
+    border-color: #6666FF;
+    transform: scale(1.05);
+}
+
+    .colorscheme-btn.viridis {
+        background: linear-gradient(to right, #440154, #21908c, #fde725);
+    }
+
+    .colorscheme-btn.plasma {
+        background: linear-gradient(to right, #ff0000, #bbbbbb, #0000ff);
+    }
+
+    .colorscheme-btn.hot {
+        background: linear-gradient(to right, #000000, #ff0000, #ffff00, #ffffff);
+    }
+
+    .colorscheme-btn.cividis {
+        background: linear-gradient(to right, #00204c, #646464, #fde725);
+    }
+
+
+    .colorscheme-btn.YlGnBu {
+        background: linear-gradient(to right, #154fc8, #41b6c4, #f7fcb9);
+    }
+
+
+    .heatmap-container {
+        flex: 1;
+        position: relative;
+        min-height: 0;
+        width: 100%;
+        height: 100%;
+    }
+
+    #heatmap {
+        width: 100%;
+        height: 100%;
+    }
+
+    .range-slider-container {
+        margin: 6px 0;
+        position: relative;
+    }
+
+    .range-slider {
+        position: relative;
+        height: 4px;
+        background: #e9ecef;
+        border-radius: 2px;
+    }
+
+    .range-slider-track {
+    position: absolute;
+    height: 100%;
+    background: #6666FF;
+    border-radius: 2px;
+}
+
+    .range-slider input[type="range"] {
+        position: absolute;
+        width: 100%;
+        height: 4px;
+        background: transparent;
+        -webkit-appearance: none;
+        appearance: none;
+        pointer-events: none;
+    }
+
+    .range-slider input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    height: 16px;
+    width: 16px;
+    border-radius: 50%;
+    background: #6666FF;
+    cursor: pointer;
+    pointer-events: all;
+    border: 2px solid white;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+
+.range-slider input[type="range"]::-moz-range-thumb {
+    height: 16px;
+    width: 16px;
+    border-radius: 50%;
+    background: #6666FF;
+    cursor: pointer;
+    pointer-events: all;
+    border: 2px solid white;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+
+    .range-values {
+        display: flex;
+        justify-content: space-between;
+        margin-top: 4px;
+        font-size: 11px;
+        color: #6c757d;
+    }
+
+    .topk-control {
+        margin: 8px 0;
+    }
+
+    .topk-slider-container {
+        margin: 6px 0;
+    }
+
+    .topk-slider {
+        width: 100%;
+        height: 4px;
+        background: #e9ecef;
+        border-radius: 2px;
+        -webkit-appearance: none;
+        appearance: none;
+    }
+
+    .topk-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    height: 16px;
+    width: 16px;
+    border-radius: 50%;
+    background: #6666FF;
+    cursor: pointer;
+    border: 2px solid white;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+
+    .topk-slider::-moz-range-thumb {
+    height: 16px;
+    width: 16px;
+    border-radius: 50%;
+    background: #6666FF;
+    cursor: pointer;
+    border: 2px solid white;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+
+    .topk-axis-selector {
+        display: flex;
+        gap: 4px;
+        margin-top: 6px;
+    }
+
+    .axis-btn {
+        flex: 1;
+        padding: 6px 8px;
+        border: 1px solid #ced4da;
+        background: white;
+        border-radius: 4px;
+        font-size: 11px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+
+.axis-btn.active {
+    background: #6666FF;
+    color: white;
+    border-color: #6666FF;
+}
+
+.axis-btn:hover:not(.active) {
+    background: #f8f9fa;
+    border-color: #6666FF;
+    color: #6666FF;
+}
+    .topk-info {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-top: 4px;
+        font-size: 11px;
+        color: #6c757d;
+    }
+
+.loading-h {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 10;
+    background: rgba(255, 255, 255, 0.9);
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    text-align: center; /* 添加这行确保文本居中 */
+}
+
+.loading-h .spinner {
+    border: 3px solid #f3f4f6;
+    border-top: 3px solid #6666FF;
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    animation: spin 1s linear infinite;
+    margin: 0 auto 16px auto; /* 修改这行，确保旋转圈水平居中 */
+}
+
+.loading-h p {
+    margin: 0;
+    color: #6666FF;
+    font-size: 14px;
+    font-weight: 500;
+    white-space: nowrap;
+    text-align: center; /* 添加这行确保文本居中 */
+}
+
+.stats-grid .stat-item {
+    background: white;
+    color: #333;
+    padding: 10px;
+    border-radius: 4px;
+    text-align: center;
+    font-size: 11px;
+    border: 1px solid #e9ecef;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+}
+
+
+    @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+
+    .message {
+        padding: 10px;
+        border-radius: 4px;
+        margin: 6px 0;
+        display: none;
+        font-size: 12px;
+    }
+
+    .error {
+        color: #721c24;
+        background: #f8d7da;
+        border: 1px solid #f5c6cb;
+    }
+
+    .success {
+        color: #155724;
+        background: #d4edda;
+        border: 1px solid #c3e6cb;
+    }
+
+    .warning {
+        color: #856404;
+        background: #fff3cd;
+        border: 1px solid #ffeaa7;
+    }
+
+    .info {
+        color: #055160;
+        background: #cff4fc;
+        border: 1px solid #b6effb;
+    }
+
+    .stats-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+        margin-top: 12px;
+    }
+
+
+    .stat-item .value {
+        font-size: 1.2rem;
+        font-weight: 600;
+        margin-bottom: 2px;
+    }
+
+    .stat-item .label {
+        font-size: 0.75rem;
+        opacity: 0.9;
+    }
+
+    .topk-btn {
+        width: 24px;
+        height: 24px;
+        border: 1px solid #ced4da;
+        background: white;
+        border-radius: 3px;
+        font-size: 14px;
+        font-weight: bold;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.2s ease;
+        color: #495057;
+    }
+
+    .topk-btn:hover {
+    background: #f8f9fa;
+    border-color: #6666FF;
+    color: #6666FF;
+}
+
+    .topk-btn:active {
+        background: #e9ecef;
+    }
+
+    .topk-btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+        background: #f8f9fa;
+    }
+
+    @media (max-width: 1200px) {
+        .main-layout {
+            grid-template-columns: 1fr;
+            grid-template-rows: auto 1fr;
+        }
+
+        .sidebar {
+            flex-direction: row;
+            overflow-x: auto;
+            gap: 8px;
+        }
+
+        .control-panel {
+            min-width: 280px;
+        }
+    }
+    .export-control {
+        margin-top: 12px;
+    }
+
+    .btn-export {
+    background: #6666FF;
+    color: white;
+    width: 100%;
+}
+
+.btn-export:hover:not(:disabled) {
+    background: #5553FF;
+}
+
+    .btn-export:disabled {
+        background: #6c757d;
+        cursor: not-allowed;
+    }
+
+</style>
+
+<div class="test-container">
+    <div class="main-layout">
+        <!-- 左侧控制面板 -->
+        <div class="sidebar">
+            <!-- 数据源配置 -->
+            <div class="control-panel">
+                <div class="control-section">
+                    <div class="section-title">数据源配置</div>
+
+                    <div class="control-group">
+                        <label for="xCollection">横坐标 Collection</label>
+                        <select id="xCollection">
+                            <option value="">请选择...</option>
+                        </select>
+                        <div class="required-error" id="xCollectionError">请选择横坐标 Collection</div>
+                    </div>
+
+                    <div class="control-group">
+                        <label for="xMaxItems">横坐标最大项目数</label>
+                        <input type="number" id="xMaxItems" min="10" max="500" value="30">
+                    </div>
+
+                    <div class="control-group">
+                        <label for="yCollection">纵坐标 Collection</label>
+                        <select id="yCollection">
+                            <option value="">请选择...</option>
+                        </select>
+                        <div class="required-error" id="yCollectionError">请选择纵坐标 Collection</div>
+                    </div>
+
+                    <div class="control-group">
+                        <label for="yMaxItems">纵坐标最大项目数</label>
+                        <input type="number" id="yMaxItems" min="10" max="500" value="30">
+                    </div>
+
+                    <button class="btn btn-primary" onclick="calculateSimilarity()">计算相似度</button>
+                    <button class="btn btn-secondary" onclick="loadCollections()" style="margin-top: 6px;">刷新Collections</button>
+                </div>
+            </div>
+
+            <!-- 可视化控制 -->
+            <div class="control-panel">
+                <div class="control-section">
+                    <div class="section-title">可视化控制</div>
+
+                    <div class="control-group" id="displayFieldControls" style="display: none;">
+                        <label for="xDisplayField">横坐标显示字段</label>
+                        <select id="xDisplayField">
+                            <option value="">请先计算相似度</option>
+                        </select>
+                    </div>
+
+                    <div class="control-group" id="yDisplayFieldControls" style="display: none;">
+                        <label for="yDisplayField">纵坐标显示字段</label>
+                        <select id="yDisplayField">
+                            <option value="">请先计算相似度</option>
+                        </select>
+                    </div>
+
+                    <div class="control-group">
+                        <label>相似度阈值范围</label>
+                        <div class="range-slider-container">
+                            <div class="range-slider">
+                                <div class="range-slider-track" id="similarityTrack"></div>
+                                <input type="range" id="minSimilaritySlider" min="0" max="1" step="0.01" value="0">
+                                <input type="range" id="maxSimilaritySlider" min="0" max="1" step="0.01" value="1">
+                            </div>
+                            <div class="range-values">
+                                <span id="minSimilarityValue">0.00</span>
+                                <span id="maxSimilarityValue">1.00</span>
+                            </div>
+                        </div>
+                        <div class="dual-input-group" style="margin-top: 6px;">
+                            <input type="number" id="minSimilarityInput" min="0" max="1" step="0.01" value="0" placeholder="最小值">
+                            <input type="number" id="maxSimilarityInput" min="0" max="1" step="0.01" value="1" placeholder="最大值">
+                        </div>
+                    </div>
+
+                    <!-- Top-K 控制 -->
+                    <div class="control-group topk-control">
+                        <label>Top-K 筛选</label>
+                        <div class="topk-slider-container">
+                            <div style="display: flex; align-items: center; gap: 6px;">
+                                <button class="topk-btn" id="topkDecBtn" onclick="adjustTopk(-1)">-</button>
+                                <input type="range" id="topkSlider" class="topk-slider" min="0" max="50" step="1" value="0" style="flex: 1;">
+                                <button class="topk-btn" id="topkIncBtn" onclick="adjustTopk(1)">+</button>
+                            </div>
+                            <div class="topk-info">
+                                <span>Top-K: <span id="topkValue">0</span></span>
+                                <span id="topkStatus">显示全部</span>
+                            </div>
+                        </div>
+                        <div class="topk-axis-selector">
+                            <button class="axis-btn active" id="xAxisBtn" onclick="setTopkAxis('x')">横轴Top-K</button>
+                            <button class="axis-btn" id="yAxisBtn" onclick="setTopkAxis('y')">纵轴Top-K</button>
+                        </div>
+                    </div>
+
+                    <div class="control-group">
+                        <label for="sortOrder">排序方式</label>
+                        <select id="sortOrder">
+                            <option value="none">原始顺序</option>
+                            <option value="desc">相似度降序</option>
+                            <option value="asc">相似度升序</option>
+                            <option value="x_asc">横坐标字段升序</option>
+                            <option value="x_desc">横坐标字段降序</option>
+                            <option value="y_asc">纵坐标字段升序</option>
+                            <option value="y_desc">纵坐标字段降序</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- 统计信息 -->
+                <div class="control-section" id="statsSection" style="display: none;">
+                    <div class="section-title">统计信息</div>
+                    <div class="stats-grid" id="statsGrid"></div>
+                </div>
+                <!-- 结果操作 -->
+                <div class="control-section" id="operationsSection" style="display: none;">
+                    <div class="section-title">结果操作</div>
+                    <div class="export-control">
+                        <button class="btn btn-export" id="exportBtn" onclick="exportToExcel()">
+                            导出Excel
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 右侧热力图主区域 -->
+        <div class="heatmap-main">
+            <div class="heatmap-controls">
+                <div class="colorscheme-selector">
+                    <label style="margin-right: 8px; font-size: 12px; font-weight: 500; color: #495057;">配色方案:</label>
+                    <div class="colorscheme-btn viridis active" data-scheme="viridis" title="Viridis"></div>
+                    <div class="colorscheme-btn plasma" data-scheme="plasma" title="Plasma"></div>
+                    <div class="colorscheme-btn cividis" data-scheme="cividis" title="Cividis"></div>
+                    <div class="colorscheme-btn YlGnBu" data-scheme="YlGnBu" title="YlGnBu"></div>
+                    <div class="colorscheme-btn hot" data-scheme="hot" title="Hot"></div>
+                </div>
+            </div>
+
+            <div class="heatmap-container">
+                <div class="loading-h" id="loading">
+                    <div class="spinner"></div>
+                    <p id="loadingText">正在加载...</p>
+                </div>
+                <div id="heatmap"></div>
+            </div>
+        </div>
+    </div>
+
+    <div id="errorMessage" class="message error"></div>
+    <div id="successMessage" class="message success"></div>
+    <div id="warningMessage" class="message warning"></div>
+    <div id="infoMessage" class="message info"></div>
+</div>
+
+<!-- 引入 Plotly.js -->
+<script src="/static/js/exceljs-4-3-0/exceljs.min.js"></script>
+<script src="/static/js/plotly-js-2-26-0/plotly.min.js"></script>
+
+<script>
+    // 全局变量
+    let originalMatrix = null;
+    let filteredMatrix = null;
+    let originalXData = [];
+    let originalYData = [];
+    let currentXData = [];
+    let currentYData = [];
+    let currentXLabels = [];
+    let currentYLabels = [];
+    let currentResult = null;
+    let currentColorScheme = 'viridis';
+    let xAvailableFields = [];
+    let yAvailableFields = [];
+    let currentTopkAxis = 'x'; // 'x' 或 'y'
+
+    const DEFAULT_FIELD_NAMES = ['document', 'text', 'name'];
+
+    // API配置 - 直接使用当前系统的API端点
+    const API_BASE_URL = '/api/knowledge/similarity';
+
+    // 颜色方案配置
+    const colorSchemes = {
+        viridis: 'Viridis',
+        plasma: 'Plasma',
+        cividis: 'Cividis',
+        hot: 'Hot',
+        YlGnBu: 'YlGnBu',
+
+    };
+
+    // 消息显示函数
+    function showMessage(type, message, duration = 5000) {
+        const messageId = type + 'Message';
+        const messageDiv = document.getElementById(messageId);
+        messageDiv.textContent = message;
+        messageDiv.style.display = 'block';
+
+        // 隐藏其他类型的消息
+        ['error', 'success', 'warning', 'info'].forEach(t => {
+            if (t !== type) {
+                document.getElementById(t + 'Message').style.display = 'none';
+            }
+        });
+
+        if (duration > 0) {
+            setTimeout(() => {
+                messageDiv.style.display = 'none';
+            }, duration);
+        }
+    }
+
+    function showError(message, duration = 5000) { showMessage('error', message, duration); }
+    function showSuccess(message, duration = 3000) { showMessage('success', message, duration); }
+    function showWarning(message, duration = 4000) { showMessage('warning', message, duration); }
+    function showInfo(message, duration = 3000) { showMessage('info', message, duration); }
+
+    // 显示加载状态
+    function showLoading(show = true, text = '正在加载...') {
+        document.getElementById('loading').style.display = show ? 'block' : 'none';
+        document.getElementById('loadingText').textContent = text;
+    }
+
+    // 显示必要字段验证错误
+    function showFieldValidationError(fieldId, show = true) {
+        const field = document.getElementById(fieldId);
+        const errorDiv = document.getElementById(fieldId + 'Error');
+
+        if (show) {
+            field.classList.add('required-empty');
+            errorDiv.style.display = 'block';
+        } else {
+            field.classList.remove('required-empty');
+            errorDiv.style.display = 'none';
+        }
+    }
+
+    // 清除所有验证错误状态
+    function clearValidationErrors() {
+        const requiredFields = ['xCollection', 'yCollection'];
+        requiredFields.forEach(fieldId => {
+            showFieldValidationError(fieldId, false);
+        });
+    }
+
+    // 获取默认显示字段函数
+    function getDefaultDisplayField(availableFields) {
+        // 遍历优先级列表，返回第一个匹配的字段
+        for (const defaultField of DEFAULT_FIELD_NAMES) {
+            if (availableFields.includes(defaultField)) {
+                return defaultField;
+            }
+        }
+        // 如果没有匹配的默认字段，返回 'order_id'
+        return 'order_id';
+    }
+
+
+    // API调用函数
+    async function apiCall(endpoint, options = {}) {
+        const url = `${API_BASE_URL}${endpoint}`;
+        const defaultOptions = {
+            headers: { 'Content-Type': 'application/json' }
+        };
+
+        const finalOptions = { ...defaultOptions, ...options };
+
+        try {
+            const response = await fetch(url, finalOptions);
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.error || data.detail || `HTTP ${response.status}`);
+            }
+
+            if (data.success === false) {
+                throw new Error(data.error || '未知错误');
+            }
+
+            return data;
+        } catch (error) {
+            console.error('API调用失败:', error);
+            throw error;
+        }
+    }
+
+    // 加载Collections列表
+    async function loadCollections() {
+        try {
+            showLoading(true, '正在加载Collections...');
+
+            const data = await apiCall('/collections');
+            const collections = data.collections || [];
+
+            const selects = ['xCollection', 'yCollection'];
+            selects.forEach(selectId => {
+                const select = document.getElementById(selectId);
+                select.innerHTML = '<option value="">请选择...</option>';
+
+                collections.forEach(collection => {
+                    const option = new Option(collection, collection);
+                    select.add(option);
+                });
+            });
+
+            showSuccess(`成功加载 ${collections.length} 个Collections`);
+
+        } catch (error) {
+            showError('加载Collections失败: ' + error.message);
+        } finally {
+            showLoading(false);
+        }
+    }
+
+    // 当collection选择变化时，清除验证错误
+    document.getElementById('xCollection').addEventListener('change', function() {
+        showFieldValidationError('xCollection', false);
+    });
+
+    document.getElementById('yCollection').addEventListener('change', function() {
+        showFieldValidationError('yCollection', false);
+    });
+
+    // 生成唯一标签函数，使用零宽字符和不间断空格确保唯一性
+    function generateUniqueLabels(data, field) {
+        // 使用 Map 来跟踪每个值的出现次数
+        const valueCountMap = new Map();
+
+        return data.map((item, index) => {
+            let baseValue;
+            if (field === 'order_id') {
+                baseValue = `ID-${item[field]}`;
+            } else {
+                baseValue = String(item[field] || 'N/A');
+            }
+
+            // 跟踪值的出现次数
+            const currentCount = valueCountMap.get(baseValue) || 0;
+            valueCountMap.set(baseValue, currentCount + 1);
+
+            // 如果值重复，添加零宽字符和不间断空格来确保唯一性
+            if (currentCount > 0) {
+                // 零宽字符：\u200B (零宽空格)
+                // 不间断空格：\u00A0
+                // 根据重复次数添加不同数量的零宽字符
+                const uniqueSuffix = '\u200B'.repeat(currentCount) + '\u00A0';
+                return baseValue + uniqueSuffix;
+            } else {
+                return baseValue;
+            }
+        });
+    }
+
+    // 更新显示字段选择器
+    function updateDisplayFieldControls() {
+        if (!currentResult) return;
+
+        // 显示字段控制区域
+        document.getElementById('displayFieldControls').style.display = 'block';
+        document.getElementById('yDisplayFieldControls').style.display = 'block';
+
+        // 获取默认显示字段
+        const defaultXField = getDefaultDisplayField(xAvailableFields);
+        const defaultYField = getDefaultDisplayField(yAvailableFields);
+
+        // 更新X轴显示字段列表
+        const xDisplaySelect = document.getElementById('xDisplayField');
+        xDisplaySelect.innerHTML = '';
+        xAvailableFields.forEach(field => {
+            const option = new Option(
+                field === 'order_id' ? '顺序ID' : field,
+                field
+            );
+            xDisplaySelect.add(option);
+        });
+        xDisplaySelect.value = defaultXField; // 使用匹配到的默认字段
+
+        // 更新Y轴显示字段列表
+        const yDisplaySelect = document.getElementById('yDisplayField');
+        yDisplaySelect.innerHTML = '';
+        yAvailableFields.forEach(field => {
+            const option = new Option(
+                field === 'order_id' ? '顺序ID' : field,
+                field
+            );
+            yDisplaySelect.add(option);
+        });
+        yDisplaySelect.value = defaultYField; // 使用匹配到的默认字段
+
+        // 添加字段选择变化监听器
+        xDisplaySelect.addEventListener('change', function() {
+            updateLabelsAndVisualization();
+        });
+
+        yDisplaySelect.addEventListener('change', function() {
+            updateLabelsAndVisualization();
+        });
+    }
+
+
+    // 更新标签和可视化
+    function updateLabelsAndVisualization() {
+        if (!currentResult) return;
+
+        const xField = document.getElementById('xDisplayField').value;
+        const yField = document.getElementById('yDisplayField').value;
+
+        // 使用修复后的函数生成唯一标签
+        currentXLabels = generateUniqueLabels(currentXData, xField);
+        currentYLabels = generateUniqueLabels(currentYData, yField);
+
+        // 更新热力图
+        updateHeatmap();
+    }
+
+    // 设置Top-K轴选择
+    function setTopkAxis(axis) {
+        currentTopkAxis = axis;
+
+        // 更新按钮状态
+        document.getElementById('xAxisBtn').classList.toggle('active', axis === 'x');
+        document.getElementById('yAxisBtn').classList.toggle('active', axis === 'y');
+
+        // 更新Top-K滑块的最大值
+        updateTopkSliderMax();
+
+        // 更新热力图
+        if (filteredMatrix) {
+            updateHeatmap();
+        }
+    }
+
+    // 应用Top-K筛选
+    function applyTopkFilter(matrix, xLabels, yLabels, xData, yData) {
+        const topk = parseInt(document.getElementById('topkSlider').value);
+
+        if (topk === 0) {
+            return { matrix, xLabels, yLabels, xData, yData };
+        }
+
+        const minSim = parseFloat(document.getElementById('minSimilaritySlider').value);
+        const maxSim = parseFloat(document.getElementById('maxSimilaritySlider').value);
+
+        // 创建新的矩阵，初始化为null
+        let newMatrix = matrix.map(row => row.map(() => null));
+
+        if (currentTopkAxis === 'x') {
+            // 横轴Top-K：对每一行（Y轴的每个项目），找出相似度最高的K个X轴项目
+            for (let i = 0; i < matrix.length; i++) {
+                const row = matrix[i];
+                const validPairs = [];
+
+                for (let j = 0; j < row.length; j++) {
+                    if (row[j] >= minSim && row[j] <= maxSim) {
+                        validPairs.push({ index: j, similarity: row[j] });
+                    }
+                }
+
+                // 按相似度降序排序，取前K个
+                validPairs.sort((a, b) => b.similarity - a.similarity);
+                const topKPairs = validPairs.slice(0, topk);
+
+                // 只保留Top-K的值，其他位置保持null
+                topKPairs.forEach(pair => {
+                    newMatrix[i][pair.index] = matrix[i][pair.index];
+                });
+            }
+
+        } else {
+            // 纵轴Top-K：对每一列（X轴的每个项目），找出相似度最高的K个Y轴项目
+            for (let j = 0; j < matrix[0].length; j++) {
+                const validPairs = [];
+
+                for (let i = 0; i < matrix.length; i++) {
+                    if (matrix[i][j] >= minSim && matrix[i][j] <= maxSim) {
+                        validPairs.push({ index: i, similarity: matrix[i][j] });
+                    }
+                }
+
+                // 按相似度降序排序，取前K个
+                validPairs.sort((a, b) => b.similarity - a.similarity);
+                const topKPairs = validPairs.slice(0, topk);
+
+                // 只保留Top-K的值，其他位置保持null
+                topKPairs.forEach(pair => {
+                    newMatrix[pair.index][j] = matrix[pair.index][j];
+                });
+            }
+        }
+
+        return {
+            matrix: newMatrix,
+            xLabels: [...xLabels],
+            yLabels: [...yLabels],
+            xData: [...xData],
+            yData: [...yData]
+        };
+    }
+
+    // 计算相似度矩阵
+    async function calculateSimilarity() {
+        const xCollection = document.getElementById('xCollection').value;
+        const yCollection = document.getElementById('yCollection').value;
+        const xMaxItems = parseInt(document.getElementById('xMaxItems').value) || 30;
+        const yMaxItems = parseInt(document.getElementById('yMaxItems').value) || 30;
+
+        // 先清除之前的验证错误
+        clearValidationErrors();
+
+        // 检查必要项是否填写
+        const requiredFields = [
+            { value: xCollection, id: 'xCollection', name: '横坐标 Collection' },
+            { value: yCollection, id: 'yCollection', name: '纵坐标 Collection' }
+        ];
+
+        const missingFields = requiredFields.filter(field => !field.value);
+
+        if (missingFields.length > 0) {
+            // 给未填写的字段添加红色边框
+            missingFields.forEach(field => {
+                showFieldValidationError(field.id, true);
+            });
+
+            const missingNames = missingFields.map(field => field.name).join('、');
+            showError(`请填写以下必要字段：${missingNames}`);
+            return;
+        }
+
+        try {
+            showLoading(true, '正在计算相似度矩阵...');
+
+            const data = await apiCall('/calculate', {
+                method: 'POST',
+                body: JSON.stringify({
+                    x_collection: xCollection,
+                    y_collection: yCollection,
+                    x_max_items: xMaxItems,
+                    y_max_items: yMaxItems
+                })
+            });
+
+            currentResult = data.result;
+            originalMatrix = currentResult.matrix;
+            originalXData = currentResult.x_data;
+            originalYData = currentResult.y_data;
+            xAvailableFields = currentResult.x_available_fields;
+            yAvailableFields = currentResult.y_available_fields;
+
+            // 根据设置的最大项目数进行裁剪
+            currentXData = originalXData.slice(0, xMaxItems);
+            currentYData = originalYData.slice(0, yMaxItems);
+
+            // 裁剪矩阵
+            filteredMatrix = originalMatrix.slice(0, yMaxItems).map(row => row.slice(0, xMaxItems));
+
+            // 更新显示字段控制器
+            updateDisplayFieldControls();
+
+            // 获取默认显示字段（在控件更新后）
+            const defaultXField = getDefaultDisplayField(xAvailableFields);
+            const defaultYField = getDefaultDisplayField(yAvailableFields);
+
+            // 使用默认字段生成初始标签
+            currentXLabels = generateUniqueLabels(currentXData, defaultXField);
+            currentYLabels = generateUniqueLabels(currentYData, defaultYField);
+
+            // 更新Top-K滑块的最大值
+            updateTopkSliderMax();
+
+            // 更新可视化
+            createHeatmap();
+
+            // 显示统计信息
+            showStatistics(currentResult.stats);
+
+            showSuccess('相似度计算完成！');
+
+        } catch (error) {
+            showError('计算相似度失败: ' + error.message);
+        } finally {
+            showLoading(false);
+        }
+    }
+
+    // 更新Top-K滑块的最大值
+    function updateTopkSliderMax() {
+        if (!filteredMatrix) return;
+
+        const maxX = filteredMatrix[0] ? filteredMatrix[0].length : 0;
+        const maxY = filteredMatrix.length;
+
+        // 根据当前选择的轴确定最大值
+        const maxTopk = currentTopkAxis === 'x' ? maxX : maxY;
+
+        const topkSlider = document.getElementById('topkSlider');
+        topkSlider.max = maxTopk;
+
+        // 如果当前值超过最大值，重置为最大值
+        if (parseInt(topkSlider.value) > maxTopk) {
+            topkSlider.value = maxTopk;
+            updateTopkDisplay();
+        }
+
+        // 更新增减按钮状态
+        updateTopkButtons();
+    }
+
+    // 更新Top-K增减按钮状态
+    function updateTopkButtons() {
+        // 移除所有禁用逻辑，按钮始终可用
+        const decBtn = document.getElementById('topkDecBtn');
+        const incBtn = document.getElementById('topkIncBtn');
+
+        decBtn.disabled = false;
+        incBtn.disabled = false;
+    }
+
+    // 调整Top-K值
+    function adjustTopk(delta) {
+        const topkSlider = document.getElementById('topkSlider');
+        const currentValue = parseInt(topkSlider.value);
+        const minValue = parseInt(topkSlider.min);
+        const maxValue = parseInt(topkSlider.max);
+        const newValue = Math.max(minValue, Math.min(maxValue, currentValue + delta));
+        if (newValue !== currentValue) {
+            topkSlider.value = newValue;
+            updateTopkDisplay();
+            // 实时更新热力图
+            if (filteredMatrix) {
+                updateHeatmap();
+            }
+        }
+
+        // 确保按钮状态正确更新
+        updateTopkButtons();
+    }
+
+    // 计算当前显示的对比数
+    function getCurrentDisplayCount() {
+        if (!filteredMatrix) return 0;
+        const minSim = parseFloat(document.getElementById('minSimilaritySlider').value);
+        const maxSim = parseFloat(document.getElementById('maxSimilaritySlider').value);
+        // 先应用阈值过滤
+        let thresholdMatrix = filteredMatrix.map(row =>
+            row.map(val => (val >= minSim && val <= maxSim) ? val : null)
+        );
+        // 再应用Top-K筛选
+        let topkResult = applyTopkFilter(thresholdMatrix, currentXLabels, currentYLabels, currentXData, currentYData);
+        let displayMatrix = topkResult.matrix;
+        // 计算最终显示的非null值数量
+        let count = 0;
+        displayMatrix.forEach(row => {
+            row.forEach(val => {
+                if (val !== null) {
+                    count++;
+                }
+            });
+        });
+        return count;
+    }
+
+    // 更新热力图（实时响应控制变化）
+    function updateHeatmap() {
+        if (!filteredMatrix) {
+            return;
+        }
+
+        // 保存当前的缩放和选中状态
+        let currentLayout = null;
+        const heatmapDiv = document.getElementById('heatmap');
+        if (heatmapDiv && heatmapDiv.layout) {
+            currentLayout = {
+                xaxis: {
+                    range: heatmapDiv.layout.xaxis.range,
+                    autorange: heatmapDiv.layout.xaxis.autorange
+                },
+                yaxis: {
+                    range: heatmapDiv.layout.yaxis.range,
+                    autorange: heatmapDiv.layout.yaxis.autorange
+                }
+            };
+        }
+
+        // 获取当前阈值
+        const minSim = parseFloat(document.getElementById('minSimilaritySlider').value);
+        const maxSim = parseFloat(document.getElementById('maxSimilaritySlider').value);
+        const sortOrder = document.getElementById('sortOrder').value;
+
+        // 先应用阈值过滤
+        let thresholdMatrix = filteredMatrix.map(row =>
+            row.map(val => (val >= minSim && val <= maxSim) ? val : null)
+        );
+
+        // 再应用Top-K筛选（传入已经过阈值过滤的矩阵）
+        let topkResult = applyTopkFilter(thresholdMatrix, currentXLabels, currentYLabels, currentXData, currentYData);
+
+        let displayMatrix = topkResult.matrix;
+        let displayXLabels = [...topkResult.xLabels];
+        let displayYLabels = [...topkResult.yLabels];
+        let displayXData = [...topkResult.xData];
+        let displayYData = [...topkResult.yData];
+
+        // 应用排序
+        if (sortOrder !== 'none') {
+            const sortedData = applySorting(displayMatrix, displayXLabels, displayYLabels, displayXData, displayYData, sortOrder);
+            displayMatrix = sortedData.matrix;
+            displayXLabels = sortedData.xLabels;
+            displayYLabels = sortedData.yLabels;
+        }
+
+        // 更新热力图数据，但保持当前的缩放状态
+        updateHeatmapData(displayMatrix, displayXLabels, displayYLabels, currentLayout);
+
+        // 更新统计信息中的当前显示对比数
+        updateCurrentDisplayStat();
+    }
+
+    // 更新热力图数据但保持缩放状态
+    function updateHeatmapData(matrix, xLabels, yLabels, preserveLayout = null) {
+        const trace = {
+            z: matrix,
+            x: xLabels,
+            y: yLabels,
+            type: 'heatmap',
+            colorscale: colorSchemes[currentColorScheme],
+            hoverongaps: false,
+            hovertemplate: '<b>%{y}</b><br>' +
+                          '<b>%{x}</b><br>' +
+                          '<b>相似度: %{z:.4f}</b>' +
+                          '<extra></extra>',
+            colorbar: {
+                title: '相似度',
+                titleside: 'right',
+                tickmode: 'linear',
+                tick0: 0,
+                dtick: 0.1
+            },
+            showscale: true
+        };
+
+        // 如果有保存的布局状态，则应用它
+        if (preserveLayout) {
+            const currentHeatmapDiv = document.getElementById('heatmap');
+
+            // 使用 Plotly.restyle 只更新数据，不影响布局
+            Plotly.restyle('heatmap', {
+                z: [matrix],
+                x: [xLabels],
+                y: [yLabels],
+                colorscale: [colorSchemes[currentColorScheme]]
+            });
+
+            // 如果需要恢复特定的缩放范围，使用 relayout
+            if (preserveLayout.xaxis.range || preserveLayout.yaxis.range) {
+                const layoutUpdate = {};
+
+                if (preserveLayout.xaxis.range) {
+                    layoutUpdate['xaxis.range'] = preserveLayout.xaxis.range;
+                    layoutUpdate['xaxis.autorange'] = false;
+                }
+
+                if (preserveLayout.yaxis.range) {
+                    layoutUpdate['yaxis.range'] = preserveLayout.yaxis.range;
+                    layoutUpdate['yaxis.autorange'] = false;
+                }
+
+                if (Object.keys(layoutUpdate).length > 0) {
+                    Plotly.relayout('heatmap', layoutUpdate);
+                }
+            }
+        } else {
+            // 如果没有保存的布局状态，使用完整的重新绘制
+            createHeatmap(matrix, xLabels, yLabels);
+        }
+    }
+
+    // 更新当前显示对比数统计
+    function updateCurrentDisplayStat() {
+        const currentDisplayElement = document.getElementById('currentDisplayCount');
+        if (currentDisplayElement) {
+            const currentCount = getCurrentDisplayCount();
+            currentDisplayElement.textContent = currentCount;
+        }
+    }
+
+    // 应用排序逻辑，使用唯一标签
+    function applySorting(matrix, xLabels, yLabels, xData, yData, sortOrder) {
+        let indices = [];
+
+        switch (sortOrder) {
+            case 'asc':
+            case 'desc':
+                // 按相似度排序：计算每个位置的平均相似度
+                for (let i = 0; i < matrix.length; i++) {
+                    for (let j = 0; j < matrix[i].length; j++) {
+                        if (matrix[i][j] !== null) {
+                            indices.push({
+                                x: j, y: i,
+                                similarity: matrix[i][j],
+                                xLabel: xLabels[j],
+                                yLabel: yLabels[i]
+                            });
+                        }
+                    }
+                }
+                indices.sort((a, b) => sortOrder === 'asc' ?
+                    a.similarity - b.similarity : b.similarity - a.similarity);
+                break;
+
+            case 'x_asc':
+            case 'x_desc':
+                // 按X轴标签排序 - 获取当前显示字段
+                const xDisplayField = document.getElementById('xDisplayField').value;
+                const xIndexOrder = xData.map((item, index) => ({
+                    value: xDisplayField === 'order_id' ? item.order_id : String(item[xDisplayField] || ''),
+                    index: index,
+                    originalIndex: index  // 保存原始索引，用于处理重复值
+                })).sort((a, b) => {
+                    const aVal = String(a.value);
+                    const bVal = String(b.value);
+
+                    // 如果值相同，按照原始索引排序保持稳定性
+                    if (aVal === bVal) {
+                        return a.originalIndex - b.originalIndex;
+                    }
+
+                    return sortOrder === 'x_asc' ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
+                });
+
+                // 重新生成唯一标签，保持排序后的顺序
+                const sortedXData = xIndexOrder.map(x => xData[x.index]);
+                const newXLabels = generateUniqueLabels(sortedXData, xDisplayField);
+                const newMatrix = matrix.map(row =>
+                    xIndexOrder.map(x => row[x.index])
+                );
+
+                return { matrix: newMatrix, xLabels: newXLabels, yLabels: [...yLabels] };
+
+            case 'y_asc':
+            case 'y_desc':
+                // 按Y轴标签排序 - 获取当前显示字段
+                const yDisplayField = document.getElementById('yDisplayField').value;
+                const yIndexOrder = yData.map((item, index) => ({
+                    value: yDisplayField === 'order_id' ? item.order_id : String(item[yDisplayField] || ''),
+                    index: index,
+                    originalIndex: index  // 保存原始索引，用于处理重复值
+                })).sort((a, b) => {
+                    const aVal = String(a.value);
+                    const bVal = String(b.value);
+
+                    // 如果值相同，按照原始索引排序保持稳定性
+                    if (aVal === bVal) {
+                        return a.originalIndex - b.originalIndex;
+                    }
+
+                    return sortOrder === 'y_asc' ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
+                });
+
+                // 重新生成唯一标签，保持排序后的顺序
+                const sortedYData = yIndexOrder.map(y => yData[y.index]);
+                const newYLabels = generateUniqueLabels(sortedYData, yDisplayField);
+                const sortedMatrix = yIndexOrder.map(y => matrix[y.index]);
+
+                return { matrix: sortedMatrix, xLabels: [...xLabels], yLabels: newYLabels };
+        }
+
+        return { matrix, xLabels, yLabels };
+    }
+
+    // 创建热力图
+    function createHeatmap(matrix = filteredMatrix, xLabels = currentXLabels, yLabels = currentYLabels) {
+        if (!matrix) {
+            showError('没有相似度数据');
+            return;
+        }
+
+        const trace = {
+            z: matrix,
+            x: xLabels,
+            y: yLabels,
+            type: 'heatmap',
+            colorscale: colorSchemes[currentColorScheme],
+            hoverongaps: false,
+            hovertemplate: '<b>%{y}</b><br>' +
+                          '<b>%{x}</b><br>' +
+                          '<b>相似度: %{z:.4f}</b>' +
+                          '<extra></extra>',
+            colorbar: {
+                title: '相似度',
+                titleside: 'right',
+                tickmode: 'linear',
+                tick0: 0,
+                dtick: 0.1
+            },
+            showscale: true
+        };
+
+        // 获取容器实际尺寸
+        const container = document.querySelector('.heatmap-container');
+        const containerRect = container.getBoundingClientRect();
+
+        // 计算可用空间（减去padding和controls的高度）
+        const availableWidth = containerRect.width - 24; // 减去左右padding
+        const controlsHeight = document.querySelector('.heatmap-controls').offsetHeight;
+        const availableHeight = containerRect.height - controlsHeight - 24; // 减去controls高度和padding
+
+        // 动态生成坐标轴标题
+        const xCollectionName = document.getElementById('xCollection').value;
+        const yCollectionName = document.getElementById('yCollection').value;
+        const xDisplayField = document.getElementById('xDisplayField').value;
+        const yDisplayField = document.getElementById('yDisplayField').value;
+
+        const xFieldName = xDisplayField === 'order_id' ? '顺序ID' : xDisplayField;
+        const yFieldName = yDisplayField === 'order_id' ? '顺序ID' : yDisplayField;
+
+        const layout = {
+    title: {
+        text: '相似度热力图',
+        font: { size: 14, color: '#404040' },
+        x: 0.5
+    },
+    xaxis: {
+        title: `${xCollectionName} (${xFieldName})`,
+        tickangle: -45,
+        side: 'bottom',
+        tickfont: { size: 9 },
+        titlefont: { color: '#404040' }
+    },
+    yaxis: {
+        title: `${yCollectionName} (${yFieldName})`,
+        autorange: 'reversed',
+        tickfont: { size: 9 },
+        titlefont: { color: '#404040' }
+    },
+    margin: { l: 70, r: 50, t: 50, b: 80 },
+    width: availableWidth,
+    height: availableHeight,
+    autosize: false,
+    plot_bgcolor: 'white',
+    paper_bgcolor: 'white'
+};
+
+        const config = {
+            responsive: false, // 改为false，使用手动控制尺寸
+            displayModeBar: true,
+            modeBarButtonsToRemove: ['pan2d', 'lasso2d', 'select2d'],
+            displaylogo: false,
+            scrollZoom: true
+        };
+
+        // 使用 Plotly.newPlot 重新创建图表
+        Plotly.newPlot('heatmap', [trace], layout, config);
+    }
+
+    // 显示统计信息
+    function showStatistics(stats) {
+        const statsSection = document.getElementById('statsSection');
+        const statsGrid = document.getElementById('statsGrid');
+
+        const currentDisplayCount = getCurrentDisplayCount();
+
+        statsGrid.innerHTML = `
+            <div class="stat-item">
+                <div class="value">${stats.total_pairs}</div>
+                <div class="label">总对比数</div>
+            </div>
+            <div class="stat-item">
+                <div class="value" id="currentDisplayCount">${currentDisplayCount}</div>
+                <div class="label">当前显示对比数</div>
+            </div>
+            <div class="stat-item">
+                <div class="value">${stats.avg_similarity.toFixed(3)}</div>
+                <div class="label">平均相似度</div>
+            </div>
+            <div class="stat-item">
+                <div class="value">${stats.max_similarity.toFixed(3)}</div>
+                <div class="label">最高相似度</div>
+            </div>
+            <div class="stat-item">
+                <div class="value">${stats.min_similarity.toFixed(3)}</div>
+                <div class="label">最低相似度</div>
+            </div>
+            <div class="stat-item">
+                <div class="value">${(stats.compute_time / 1000).toFixed(1)}s</div>
+                <div class="label">计算耗时</div>
+            </div>
+        `;
+
+        statsSection.style.display = 'block';
+        operationsSection.style.display = 'block';
+    }
+
+    // 初始化双滑块
+    function initRangeSlider() {
+        const minSlider = document.getElementById('minSimilaritySlider');
+        const maxSlider = document.getElementById('maxSimilaritySlider');
+        const minInput = document.getElementById('minSimilarityInput');
+        const maxInput = document.getElementById('maxSimilarityInput');
+        const minValue = document.getElementById('minSimilarityValue');
+        const maxValue = document.getElementById('maxSimilarityValue');
+        const track = document.getElementById('similarityTrack');
+
+        function updateTrack() {
+            const min = parseFloat(minSlider.value);
+            const max = parseFloat(maxSlider.value);
+            const percent1 = min * 100;
+            const percent2 = max * 100;
+
+            track.style.left = percent1 + '%';
+            track.style.width = (percent2 - percent1) + '%';
+
+            minValue.textContent = min.toFixed(2);
+            maxValue.textContent = max.toFixed(2);
+            minInput.value = min;
+            maxInput.value = max;
+
+            // 实时更新热力图
+            if (filteredMatrix) {
+                updateHeatmap();
+            }
+        }
+
+        minSlider.addEventListener('input', function() {
+            if (parseFloat(this.value) > parseFloat(maxSlider.value)) {
+                this.value = maxSlider.value;
+            }
+            updateTrack();
+        });
+
+        maxSlider.addEventListener('input', function() {
+            if (parseFloat(this.value) < parseFloat(minSlider.value)) {
+                this.value = minSlider.value;
+            }
+            updateTrack();
+        });
+
+        minInput.addEventListener('change', function() {
+            const val = Math.max(0, Math.min(1, parseFloat(this.value) || 0));
+            minSlider.value = val;
+            updateTrack();
+        });
+
+        maxInput.addEventListener('change', function() {
+            const val = Math.max(0, Math.min(1, parseFloat(this.value) || 1));
+            maxSlider.value = val;
+            updateTrack();
+        });
+
+        updateTrack();
+    }
+
+    // 初始化Top-K滑块
+    function initTopkSlider() {
+        const topkSlider = document.getElementById('topkSlider');
+        function updateTopkDisplay() {
+            const topkSlider = document.getElementById('topkSlider');
+            const topkValue = parseInt(topkSlider.value);
+            document.getElementById('topkValue').textContent = topkValue;
+            document.getElementById('topkStatus').textContent = topkValue === 0 ? '显示全部' : `显示Top-${topkValue}`;
+            // 更新按钮状态
+            updateTopkButtons();
+        }
+        // 添加input事件监听器，实现拖动时实时更新热力图
+        topkSlider.addEventListener('input', function() {
+            updateTopkDisplay();
+            // 实时更新热力图
+            if (filteredMatrix) {
+                updateHeatmap();
+            }
+        });
+
+        updateTopkDisplay();
+    }
+
+    // 更新Top-K显示（供外部调用）
+    function updateTopkDisplay() {
+        const topkSlider = document.getElementById('topkSlider');
+        const topkValue = parseInt(topkSlider.value);
+        document.getElementById('topkValue').textContent = topkValue;
+        document.getElementById('topkStatus').textContent = topkValue === 0 ? '显示全部' : `显示Top-${topkValue}`;
+    }
+
+    // 初始化颜色方案选择器
+    function initColorSchemeSelector() {
+        const colorBtns = document.querySelectorAll('.colorscheme-btn');
+
+        colorBtns.forEach(btn => {
+            btn.addEventListener('click', function() {
+                // 移除所有active类
+                colorBtns.forEach(b => b.classList.remove('active'));
+                // 添加当前active类
+                this.classList.add('active');
+
+                currentColorScheme = this.dataset.scheme;
+
+                // 重新绘制热力图
+                if (filteredMatrix) {
+                    updateHeatmap();
+                }
+            });
+        });
+    }
+
+    // 初始化排序选择器
+    function initSortSelector() {
+        document.getElementById('sortOrder').addEventListener('change', function() {
+            if (filteredMatrix) {
+                updateHeatmap();
+            }
+        });
+    }
+
+    // 根据相似度值和当前颜色方案计算RGB颜色
+    function getSimilarityColor(similarity, colorScheme) {
+        if (similarity === null || similarity === undefined) {
+            return { r: 255, g: 255, b: 255 }; // 白色背景表示无数据
+        }
+
+        // 将相似度值映射到0-1范围
+        const normalizedValue = Math.max(0, Math.min(1, similarity));
+
+        let r, g, b;
+
+        switch (colorScheme) {
+            case 'viridis':
+                // Viridis颜色映射近似
+                if (normalizedValue < 0.25) {
+                    const t = normalizedValue / 0.25;
+                    r = Math.round(68 + (59 - 68) * t);
+                    g = Math.round(1 + (82 - 1) * t);
+                    b = Math.round(84 + (139 - 84) * t);
+                } else if (normalizedValue < 0.5) {
+                    const t = (normalizedValue - 0.25) / 0.25;
+                    r = Math.round(59 + (33 - 59) * t);
+                    g = Math.round(82 + (144 - 82) * t);
+                    b = Math.round(139 + (140 - 139) * t);
+                } else if (normalizedValue < 0.75) {
+                    const t = (normalizedValue - 0.5) / 0.25;
+                    r = Math.round(33 + (94 - 33) * t);
+                    g = Math.round(144 + (201 - 144) * t);
+                    b = Math.round(140 + (97 - 140) * t);
+                } else {
+                    const t = (normalizedValue - 0.75) / 0.25;
+                    r = Math.round(94 + (253 - 94) * t);
+                    g = Math.round(201 + (231 - 201) * t);
+                    b = Math.round(97 + (37 - 97) * t);
+                }
+                break;
+
+            case 'plasma':
+                // Plasma颜色映射近似
+                if (normalizedValue < 0.33) {
+                    const t = normalizedValue / 0.33;
+                    r = Math.round(13 + (123 - 13) * t);
+                    g = Math.round(8 + (15 - 8) * t);
+                    b = Math.round(135 + (200 - 135) * t);
+                } else if (normalizedValue < 0.66) {
+                    const t = (normalizedValue - 0.33) / 0.33;
+                    r = Math.round(123 + (202 - 123) * t);
+                    g = Math.round(15 + (15 - 15) * t);
+                    b = Math.round(200 + (161 - 200) * t);
+                } else {
+                    const t = (normalizedValue - 0.66) / 0.34;
+                    r = Math.round(202 + (240 - 202) * t);
+                    g = Math.round(15 + (249 - 15) * t);
+                    b = Math.round(161 + (33 - 161) * t);
+                }
+                break;
+
+            case 'cool':
+                // Cool颜色映射
+                r = Math.round(61 + (31 - 61) * normalizedValue);
+                g = Math.round(72 + (119 - 72) * normalizedValue);
+                b = Math.round(73 + (180 - 73) * normalizedValue);
+                break;
+
+            case 'hot':
+                // Hot颜色映射
+                if (normalizedValue < 0.33) {
+                    const t = normalizedValue / 0.33;
+                    r = Math.round(0 + (255 - 0) * t);
+                    g = 0;
+                    b = 0;
+                } else if (normalizedValue < 0.66) {
+                    const t = (normalizedValue - 0.33) / 0.33;
+                    r = 255;
+                    g = Math.round(0 + (255 - 0) * t);
+                    b = 0;
+                } else {
+                    const t = (normalizedValue - 0.66) / 0.34;
+                    r = 255;
+                    g = 255;
+                    b = Math.round(0 + (255 - 0) * t);
+                }
+                break;
+
+            case 'ocean':
+                // Ocean颜色映射
+                r = Math.round(0 + (102 - 0) * normalizedValue);
+                g = Math.round(51 + (204 - 51) * normalizedValue);
+                b = Math.round(102 + (255 - 102) * normalizedValue);
+                break;
+
+            default:
+                // 默认灰度映射
+                const gray = Math.round(255 * (1 - normalizedValue));
+                r = gray;
+                g = gray;
+                b = gray;
+        }
+
+        return { r: Math.max(0, Math.min(255, r)),
+                 g: Math.max(0, Math.min(255, g)),
+                 b: Math.max(0, Math.min(255, b)) };
+    }
+
+    // 导出Excel功能
+    async function exportToExcel() {
+        if (!filteredMatrix) {
+            showError('没有可导出的数据，请先计算相似度');
+            return;
+        }
+
+        try {
+            // 显示导出状态
+            const exportBtn = document.getElementById('exportBtn');
+            const originalText = exportBtn.textContent;
+            exportBtn.textContent = '导出中...';
+            exportBtn.disabled = true;
+
+            // 获取当前显示的数据
+            const minSim = parseFloat(document.getElementById('minSimilaritySlider').value);
+            const maxSim = parseFloat(document.getElementById('maxSimilaritySlider').value);
+            const sortOrder = document.getElementById('sortOrder').value;
+
+            // 应用过滤和排序
+            let thresholdMatrix = filteredMatrix.map(row =>
+                row.map(val => (val >= minSim && val <= maxSim) ? val : null)
+            );
+
+            let topkResult = applyTopkFilter(thresholdMatrix, currentXLabels, currentYLabels, currentXData, currentYData);
+            let displayMatrix = topkResult.matrix;
+            let displayXLabels = [...topkResult.xLabels];
+            let displayYLabels = [...topkResult.yLabels];
+            let displayXData = [...topkResult.xData];
+            let displayYData = [...topkResult.yData];
+
+            // 应用排序
+            if (sortOrder !== 'none') {
+                const sortedData = applySorting(displayMatrix, displayXLabels, displayYLabels, displayXData, displayYData, sortOrder);
+                displayMatrix = sortedData.matrix;
+                displayXLabels = sortedData.xLabels;
+                displayYLabels = sortedData.yLabels;
+            }
+
+            // 创建Excel工作簿
+            const workbook = new ExcelJS.Workbook();
+            const worksheet = workbook.addWorksheet('相似度矩阵');
+
+            // 获取当前显示字段信息
+            const xCollection = document.getElementById('xCollection').value;
+            const yCollection = document.getElementById('yCollection').value;
+            const xDisplayField = document.getElementById('xDisplayField').value;
+            const yDisplayField = document.getElementById('yDisplayField').value;
+
+            const xFieldName = xDisplayField === 'order_id' ? '顺序ID' : xDisplayField;
+            const yFieldName = yDisplayField === 'order_id' ? '顺序ID' : yDisplayField;
+
+            // 设置表头：第一行
+            const headerRow = [''];
+            displayXLabels.forEach(label => {
+                // 移除零宽字符用于Excel显示
+                const cleanLabel = label.replace(/[\u200B\u00A0]/g, '');
+                headerRow.push(cleanLabel);
+            });
+            worksheet.addRow(headerRow);
+
+            // 填充数据行
+            displayMatrix.forEach((row, rowIndex) => {
+                const dataRow = [];
+                // 第一列：Y轴标签
+                const cleanYLabel = displayYLabels[rowIndex].replace(/[\u200B\u00A0]/g, '');
+                dataRow.push(cleanYLabel);
+
+                // 其余列：相似度数据
+                row.forEach((similarity) => {
+                    dataRow.push(similarity);
+                });
+                worksheet.addRow(dataRow);
+            });
+
+            // 设置第一行和第一列为冻结窗格
+            worksheet.views = [{
+                state: 'frozen',
+                xSplit: 1,  // 冻结第一列
+                ySplit: 1   // 冻结第一行
+            }];
+
+            // 设置表头样式
+            const headerRowObj = worksheet.getRow(1);
+            headerRowObj.eachCell((cell, colNumber) => {
+                cell.fill = {
+                    type: 'pattern',
+                    pattern: 'solid',
+                    fgColor: { argb: 'FF0D6EFD' }
+                };
+                cell.font = {
+                    color: { argb: 'FFFFFFFF' },
+                    bold: true
+                };
+                cell.alignment = {
+                    horizontal: 'center',
+                    vertical: 'middle'
+                };
+            });
+
+            // 设置第一列样式（Y轴标签）
+            for (let rowIndex = 2; rowIndex <= displayMatrix.length + 1; rowIndex++) {
+                const cell = worksheet.getCell(rowIndex, 1);
+                cell.fill = {
+                    type: 'pattern',
+                    pattern: 'solid',
+                    fgColor: { argb: 'FF0D6EFD' }
+                };
+                cell.font = {
+                    color: { argb: 'FFFFFFFF' },
+                    bold: true
+                };
+                cell.alignment = {
+                    horizontal: 'center',
+                    vertical: 'middle'
+                };
+            }
+
+            // 为相似度数据单元格设置颜色和格式
+            for (let rowIndex = 0; rowIndex < displayMatrix.length; rowIndex++) {
+                for (let colIndex = 0; colIndex < displayMatrix[rowIndex].length; colIndex++) {
+                    const similarity = displayMatrix[rowIndex][colIndex];
+                    const excelRow = rowIndex + 2; // Excel行从2开始（第1行是表头）
+                    const excelCol = colIndex + 2; // Excel列从2开始（第1列是Y轴标签）
+
+                    const cell = worksheet.getCell(excelRow, excelCol);
+
+                    if (similarity !== null && similarity !== undefined) {
+                        // 设置数值和格式
+                        cell.value = similarity;
+                        cell.numFmt = '0.0000';
+
+                        // 根据相似度和当前颜色方案设置背景色
+                        const color = getSimilarityColor(similarity, currentColorScheme);
+                        const argbColor = `FF${color.r.toString(16).padStart(2, '0')}${color.g.toString(16).padStart(2, '0')}${color.b.toString(16).padStart(2, '0')}`;
+
+                        cell.fill = {
+                            type: 'pattern',
+                            pattern: 'solid',
+                            fgColor: { argb: argbColor }
+                        };
+
+                        // 根据背景色亮度调整文字颜色
+                        const brightness = (color.r * 299 + color.g * 587 + color.b * 114) / 1000;
+                        cell.font = {
+                            color: { argb: brightness > 128 ? 'FF000000' : 'FFFFFFFF' },
+                            size: 10
+                        };
+                    } else {
+                        // 无数据的单元格
+                        cell.value = '';
+                        cell.fill = {
+                            type: 'pattern',
+                            pattern: 'solid',
+                            fgColor: { argb: 'FFFFFFFF' }
+                        };
+                    }
+
+                    // 设置单元格边框和对齐方式
+                    cell.border = {
+                        top: { style: 'thin' },
+                        left: { style: 'thin' },
+                        bottom: { style: 'thin' },
+                        right: { style: 'thin' }
+                    };
+                    cell.alignment = {
+                        horizontal: 'center',
+                        vertical: 'middle'
+                    };
+                }
+            }
+
+            // 自动调整列宽
+            worksheet.columns.forEach((column) => {
+                column.width = 15;
+            });
+
+            // 设置第一列稍微宽一些以容纳标签
+            worksheet.getColumn(1).width = 20;
+
+            // 生成文件名
+            const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+            const filename = `相似度矩阵_${xCollection}_vs_${yCollection}_${timestamp}.xlsx`;
+
+            // 导出Excel文件
+            const buffer = await workbook.xlsx.writeBuffer();
+            const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+            const url = window.URL.createObjectURL(blob);
+
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+
+            showSuccess(`Excel文件导出成功：${filename}`);
+
+        } catch (error) {
+            console.error('导出Excel时出错:', error);
+            showError('导出Excel失败: ' + error.message);
+        } finally {
+            // 恢复按钮状态
+            const exportBtn = document.getElementById('exportBtn');
+            exportBtn.textContent = '导出Excel';  // 直接设置为固定文本，更可靠
+            exportBtn.disabled = false;
+        }
+    }
+
+
+    // 监听窗口大小变化，重新调整图表大小
+    window.addEventListener('resize', function() {
+        if (document.getElementById('heatmap').innerHTML && filteredMatrix) {
+            // 延迟执行以确保容器尺寸已更新
+            setTimeout(() => {
+                const container = document.querySelector('.heatmap-container');
+                const containerRect = container.getBoundingClientRect();
+                const controlsHeight = document.querySelector('.heatmap-controls').offsetHeight;
+                const availableWidth = containerRect.width - 24;
+                const availableHeight = containerRect.height - controlsHeight - 24;
+
+                Plotly.relayout('heatmap', {
+                    width: availableWidth,
+                    height: availableHeight
+                });
+            }, 150);
+        }
+    });
+
+    // 页面加载时初始化
+    document.addEventListener('DOMContentLoaded', function() {
+        initRangeSlider();
+        initTopkSlider();
+        initColorSchemeSelector();
+        initSortSelector();
+        loadCollections(); // 自动加载Collections
+    });
+</script>
+
+
+{% endblock %}

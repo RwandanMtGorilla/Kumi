@@ -1,0 +1,366 @@
+/* 基础样式 */
+:root {
+    --primary-color: #6666FF;              /* 强调色 */
+    --primary-dark: #5553FF;               /* 深色强调色 */
+    --primary-light: #AAA9FF;              /* 浅色强调色 */
+    --primary-lighter: #B5D5FF;            /* 很浅强调色 */
+    --text-primary: #404040;               /* 主要文字颜色 */
+    --primary-gradient-start: #6647A9;      /* 深色渐变起始色 */
+    --primary-gradient-end: #5553FF;        /* 深色渐变结束色 */
+    --secondary-gradient-start: #AAA9FF;    /* 浅色渐变起始色 */
+    --secondary-gradient-end: #B5D5FF;      /* 浅色渐变结束色 */
+    --primary-bg: #f3f4f6;                 /* 主背景色 */
+    --white: #ffffff;                      /* 纯白色 */
+    --gray-50: #f9fafb;                    /* 极浅灰 */
+    --gray-100: #f3f4f6;                   /* 浅灰 */
+    --gray-200: #e5e7eb;                   /* 中浅灰 */
+    --gray-300: #d1d5db;                   /* 中灰 */
+    --gray-400: #9ca3af;                   /* 深灰 */
+    --gray-500: #6b7280;                   /* 更深灰 */
+    --gray-600: #4b5563;                   /* 深色文字 */
+    --gray-700: #404040;                   /* 主要文字颜色 */
+    --header-height: 60px;
+    --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+    --shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+    --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+}
+
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background-color: var(--gray-50);
+    color: var(--gray-700);
+    line-height: 1.6;
+}
+
+/* 登录页面样式 */
+.login-body {
+    background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-dark) 100%);
+    min-height: 100vh;
+}
+
+.brand-text {
+    font-weight: 700;
+    font-size: 1.5rem;
+    color: var(--primary-color);
+}
+
+/* 顶部栏样式 */
+.navbar {
+    height: var(--header-height);
+    z-index: 1030;
+    background-color: var(--white) !important;
+    border-bottom: 1px solid var(--gray-200);
+    box-shadow: var(--shadow-sm);
+}
+
+.navbar-brand .brand-text {
+    color: var(--primary-color) !important;
+    font-size: 1.4rem;
+    font-weight: 700;
+}
+
+.navbar-brand:hover {
+    transform: scale(1.05);
+    transition: transform 0.2s ease;
+}
+
+/* 中央导航按钮样式 */
+.nav-button-head {
+    color: var(--gray-600) !important;
+    background-color: var(--white);
+    border: none;
+    padding: 0.5rem 1.25rem !important; /* 减小内边距 */
+    border-radius: 0.375rem; /* 稍微减小圆角 */
+    font-weight: 600;
+    font-size: 1rem; /* 增加字体大小 */
+    text-decoration: none;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    white-space: nowrap;
+    min-width: 110px; /* 稍微减小最小宽度 */
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.nav-button-head:hover {
+    background-color: var(--primary-color);
+    color: var(--white) !important;
+    transform: translateY(-2px);
+    box-shadow: var(--shadow);
+}
+
+.nav-button-head.active {
+    background-color: var(--primary-color);
+    color: var(--white) !important;
+    box-shadow: var(--shadow);
+    border: 2px solid var(--primary-color); /* 激活状态才显示边框 */
+}
+
+.nav-button-head i {
+    font-size: 1.2rem;
+}
+
+/* 中央导航容器 - 防止换行 */
+.navbar-nav.mx-auto {
+    flex-wrap: nowrap; /* 防止换行 */
+    gap: 1rem; /* 使用gap代替margin */
+}
+
+/* 用户下拉菜单样式 */
+.navbar .dropdown-toggle {
+    color: var(--gray-600) !important;
+    text-decoration: none;
+    padding: 0.5rem 1rem;
+    border-radius: 0.375rem;
+    transition: all 0.2s ease;
+}
+
+.navbar .dropdown-toggle:hover {
+    background-color: var(--gray-100);
+    color: var(--primary-color) !important;
+}
+
+/* 主内容区域样式 */
+.main-content {
+    margin-top: var(--header-height);
+    min-height: calc(100vh - var(--header-height));
+    background-color: var(--gray-50);
+    width: 100%;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+    .navbar-nav.mx-auto {
+        margin: 0.5rem 0 !important;
+        width: auto; /* 改为auto */
+        justify-content: center;
+        flex-wrap: nowrap; /* 确保不换行 */
+        gap: 0.5rem; /* 减小间距 */
+    }
+
+    .nav-button-head {
+        font-size: 0.95rem; /* 中等屏幕时的字体大小 */
+        padding: 0.4rem 1rem !important;
+        min-width: 95px;
+    }
+
+    .nav-button-head i {
+        font-size: 1.1rem;
+    }
+}
+
+@media (max-width: 575px) {
+    .navbar-nav.mx-auto {
+        gap: 0.25rem; /* 更小间距 */
+    }
+
+    .nav-button-head {
+        font-size: 0.85rem; /* 小屏幕时的字体大小 */
+        padding: 0.35rem 0.75rem !important;
+        min-width: 75px;
+    }
+
+    .nav-button-head i {
+        font-size: 1rem;
+    }
+}
+
+
+/* 按钮样式 */
+.btn-primary {
+    background-color: var(--primary-color);
+    border-color: var(--primary-color);
+    color: var(--white);
+    font-weight: 600;
+    padding: 0.625rem 1.5rem;
+    border-radius: 0.5rem;
+    transition: all 0.2s ease;
+}
+
+.btn-primary:hover {
+    background-color: var(--primary-dark);
+    border-color: var(--primary-dark);
+    color: var(--white);
+    transform: translateY(-1px);
+    box-shadow: var(--shadow);
+}
+
+.btn-success {
+    background-color: var(--primary-light);
+    border-color: var(--primary-light);
+    color: var(--white);
+    font-weight: 600;
+    padding: 0.625rem 1.5rem;
+    border-radius: 0.5rem;
+    transition: all 0.2s ease;
+}
+
+.btn-success:hover {
+    background-color: var(--primary-color);
+    border-color: var(--primary-color);
+    color: var(--white);
+    transform: translateY(-1px);
+    box-shadow: var(--shadow);
+}
+
+.btn-lg {
+    padding: 0.875rem 2rem;
+    font-size: 1.1rem;
+}
+
+/* 表单样式 */
+.form-control {
+    border: 1px solid var(--gray-300);
+    border-radius: 0.5rem;
+    padding: 0.75rem 1rem;
+    transition: all 0.2s ease;
+    background-color: var(--white);
+}
+
+.form-control:focus {
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.1);
+    background-color: var(--white);
+}
+
+.form-control-lg {
+    padding: 1rem 1.25rem;
+    font-size: 1.1rem;
+}
+
+.form-label {
+    font-weight: 600;
+    color: var(--gray-700);
+    margin-bottom: 0.5rem;
+}
+
+/* 警告框样式 */
+.alert-danger {
+    background-color: #fef2f2;
+    border-color: #fecaca;
+    color: #dc2626;
+    border-radius: 0.5rem;
+}
+
+.alert-success {
+    background-color: var(--primary-lighter);
+    border-color: var(--primary-light);
+    color: var(--primary-dark);
+    border-radius: 0.5rem;
+}
+
+/* 导航下拉菜单样式 */
+.dropdown-menu {
+    border: none;
+    box-shadow: var(--shadow-lg);
+    border-radius: 0.5rem;
+    padding: 0.5rem;
+    background-color: var(--white);
+}
+
+.dropdown-item {
+    border-radius: 0.375rem;
+    padding: 0.5rem 0.75rem;
+    color: var(--gray-700);
+    font-weight: 500;
+    transition: all 0.2s ease;
+}
+
+.dropdown-item:hover {
+    background-color: var(--primary-lighter);
+    color: var(--primary-dark);
+}
+
+/* 文本样式 */
+.text-primary {
+    color: var(--primary-color) !important;
+}
+
+.text-muted {
+    color: var(--gray-500) !important;
+}
+
+.lead {
+    color: var(--gray-600);
+    font-weight: 400;
+}
+
+h1, h2, h3, h4, h5, h6 {
+    color: var(--gray-700);
+    font-weight: 600;
+}
+
+/* 加载动画 */
+.loading {
+    display: inline-block;
+    width: 24px;
+    height: 24px;
+    border: 3px solid var(--gray-200);
+    border-radius: 50%;
+    border-top-color: var(--primary-color);
+    animation: spin 1s ease-in-out infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+/* 页面内容动画 */
+.page-enter {
+    opacity: 0;
+    transform: translateY(20px);
+}
+
+.page-enter-active {
+    opacity: 1;
+    transform: translateY(0);
+    transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+/* 登录卡片特殊样式 */
+.login-body .card {
+    background-color: var(--white);
+    border-radius: 1rem;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+    backdrop-filter: blur(10px);
+}
+
+.login-body .brand-text {
+    background: linear-gradient(135deg, var(--primary-color), var(--primary-light));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+/* 焦点可见性 */
+.btn:focus,
+.form-control:focus,
+.nav-link:focus {
+    outline: 2px solid var(--primary-color);
+    outline-offset: 2px;
+}
+
+/* 自定义工具提示样式 */
+.tooltip-inner {
+    background-color: var(--gray-700);
+    color: var(--white);
+    border-radius: 0.375rem;
+}
+
+/* 移动端优化 */
+@media (max-width: 575.98px) {
+    .card-body {
+        padding: 1rem;
+    }
+
+    .btn {
+        width: 100%;
+        margin-bottom: 0.5rem;
+    }
+
+    .main-content {
+        padding: 0.5rem;
+    }
+}

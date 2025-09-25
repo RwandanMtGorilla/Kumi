@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Kumi - 知识库与大模型评测平台{% endblock %}</title>
+
+    <link rel="icon" type="image/png" href="/static/images/logo-bighead.png">
+    <link rel="shortcut icon" type="image/png" href="/static/logo-bighead.png">
+    <link rel="apple-touch-icon" href="/static/images/logo.png">
+
+    <link href="/static/css/bootstrap.min.css" rel="stylesheet">
+    <link href="/static/css/bootstrap-icons.css" rel="stylesheet">
+    <link href="/static/css/style.css" rel="stylesheet">
+</head>
+<body>
+    {% block body %}
+    <!-- 固定顶部栏 -->
+    <header class="navbar navbar-expand-lg navbar-dark bg-primary fixed-top">
+        <div class="container-fluid">
+            <!-- Logo和品牌 -->
+            <a class="navbar-brand d-flex align-items-center" href="/web/dashboard">
+                <img src="/static/images/logo.png" alt="Kumi" height="30" class="me-2">
+                <span class="brand-text">Kumi</span>
+            </a>
+
+            <!-- 中央导航按钮 -->
+            <div class="navbar-nav flex-row mx-auto">
+                <a class="nav-link nav-button nav-button-head me-3" href="#" data-page="knowledge/">
+                    <i class="bi bi-book me-2"></i>知识库
+                </a>
+                <a class="nav-link nav-button nav-button-head" href="#" data-page="llm/config">
+                    <i class="bi bi-cpu me-2"></i>大模型
+                </a>
+            </div>
+
+            <!-- 用户菜单 -->
+            <div class="navbar-nav">
+                <div class="nav-item dropdown">
+                    <a class="nav-link dropdown-toggle text-white" href="#" role="button" data-bs-toggle="dropdown">
+                        <i class="bi bi-person-circle"></i> {{ user.username if user else 'Guest' }}
+                    </a>
+                    <ul class="dropdown-menu">
+                        <li><a class="dropdown-item" href="/web/logout">退出登录</a></li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- 主内容区域 -->
+    <main class="main-content">
+        <div class="container-fluid py-4">
+            <div id="pageContent">
+                {% block content %}{% endblock %}
+            </div>
+        </div>
+    </main>
+    {% endblock %}
+
+    <script src="/static/js/bootstrap.bundle.min.js"></script>
+    <script src="/static/js/main.js"></script>
+</body>
+</html>

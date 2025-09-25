@@ -1,0 +1,654 @@
+{% extends "base.html" %}
+
+{% block title %}
+创建测评规则 - Kumi
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- 二级导航栏 -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <nav class="nav nav-pills justify-content-center">
+                <a class="nav-link" href="/web/llm/config" data-page="config">配置被测大模型</a>
+                <a class="nav-link" href="/web/llm/upload-dataset" data-page="dataset">上传测评集</a>
+                <a class="nav-link active" href="/web/llm/upload-rules" data-page="rules">创建测评规则</a>
+                <a class="nav-link" href="/web/llm/evaluation" data-page="evaluation">测评任务</a>
+            </nav>
+        </div>
+    </div>
+
+    <!-- 主体内容 -->
+    <div class="row justify-content-center">
+        <div class="col-12 col-xl-10">
+            <div class="card">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center mb-4">
+                        <h5 class="card-title text-primary mb-0">测评规则管理</h5>
+                        <button class="btn btn-gradient-primary" onclick="showCreateRuleModal()">
+                            <i class="bi bi-plus-circle"></i> 创建测评规则
+                        </button>
+                    </div>
+
+                    <!-- 数据表格 -->
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>测评规则/描述</th>
+                                    <th>类型</th>
+                                    <th>更新时间</th>
+                                    <th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody id="rulesTableBody">
+                                <tr>
+                                    <td colspan="4" class="text-center text-muted">
+                                        <i class="bi bi-hourglass-split"></i> 加载中...
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 创建/编辑测评规则弹窗 -->
+<div class="modal fade" id="ruleModal" tabindex="-1" data-bs-backdrop="static">
+    <div class="modal-dialog modal-xl"> <!-- 改为modal-xl以获得更大空间 -->
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="ruleModalTitle">创建测评规则</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="ruleForm">
+                <div class="modal-body">
+                    <div class="row h-100">
+                        <!-- 左侧：模板选择 -->
+                        <div class="col-md-4">
+                            <h6 class="text-primary mb-3">选择模板</h6>
+                            <div id="templatesContainer" class="border rounded p-2 template-scroll-container">
+                                <div class="text-center text-muted p-3">
+                                    <i class="bi bi-hourglass-split"></i> 加载中...
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 右侧：规则配置 -->
+                        <div class="col-md-8">
+                            <h6 class="text-primary mb-3">规则配置</h6>
+                            <div class="rule-config-container"> <!-- 新增容器用于滚动 -->
+                                <!-- 基本信息 -->
+                                <div class="mb-3">
+                                    <label for="ruleName" class="form-label">规则名称</label>
+                                    <input type="text" class="form-control" id="ruleName" name="name" required>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label for="ruleType" class="form-label">规则类型</label>
+                                    <select class="form-select" id="ruleType" name="rule_type" required>
+                                        <option value="prompt">Prompt</option>
+                                        <option value="scoring">Scoring</option>
+                                        <option value="classification">Classification</option>
+                                    </select>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label for="ruleIntro" class="form-label">规则描述</label>
+                                    <textarea class="form-control" id="ruleIntro" name="intro" rows="2" required></textarea>
+                                </div>
+
+                                <!-- 模型配置 -->
+                                <div class="row">
+                                    <div class="col-md-8">
+                                        <div class="mb-3">
+                                            <label for="modelName" class="form-label">评测模型</label>
+                                            <input type="text" class="form-control" id="modelName" name="model_name" value="Doubao-pro-32k">
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="mb-3">
+                                            <label for="temperature" class="form-label">Temperature</label>
+                                            <input type="number" class="form-control" id="temperature" name="temperature" min="0" max="1" step="0.1" value="0.3">
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Prompt描述 -->
+                                <div class="mb-3">
+                                    <label for="promptDescription" class="form-label">Prompt描述</label>
+                                    <textarea class="form-control" id="promptDescription" name="prompt_description" rows="8" required placeholder="请输入详细的提示词描述..."></textarea>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="submit" class="btn btn-gradient-primary" id="saveRuleBtn">保存规则</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+
+<style>
+/* Consistent nav-pills styling as per previous page */
+.nav-pills .nav-link.active {
+    background: linear-gradient(135deg, var(--primary-gradient-start) 0%, var(--primary-gradient-end) 100%);
+    color: white !important;
+    border: none;
+    box-shadow: 0 4px 12px rgba(102, 102, 255, 0.3); /* Shadow consistent with primary color */
+    font-weight: 600; /* Add font-weight for active state */
+}
+
+.nav-pills .nav-link {
+    color: var(--primary-color); /* Emphasized color */
+    margin: 0 10px;
+    font-weight: 500;
+    transition: all 0.3s ease;
+}
+
+.nav-pills .nav-link:hover {
+    background: linear-gradient(135deg, rgba(170, 169, 255, 0.2) 0%, rgba(181, 213, 255, 0.2) 100%); /* Light gradient transparent hover */
+    color: var(--primary-dark); /* Darker primary on hover */
+}
+
+/* 增加主体内容的边距 */
+.container-fluid {
+    padding-left: 2rem;
+    padding-right: 2rem;
+}
+
+@media (max-width: 768px) {
+    .container-fluid {
+        padding-left: 1rem;
+        padding-right: 1rem;
+    }
+}
+
+/* 确保卡片标题样式一致 */
+.card-title {
+    font-size: 1.25rem;
+    font-weight: 600;
+}
+
+
+/* Modal responsive behavior */
+.modal-dialog.modal-xl {
+    max-width: 90vw; /* 在大屏幕上使用90%宽度 */
+    width: 90vw;
+}
+
+@media (max-width: 1200px) {
+    .modal-dialog.modal-xl {
+        max-width: 95vw;
+        width: 95vw;
+    }
+}
+
+@media (max-width: 768px) {
+    .modal-dialog.modal-xl {
+        max-width: 98vw;
+        width: 98vw;
+        margin: 0.5rem;
+    }
+
+    /* 小屏幕下垂直排列 */
+    .modal-body .row {
+        flex-direction: column;
+    }
+
+    .modal-body .col-md-4,
+    .modal-body .col-md-8 {
+        max-width: 100%;
+        flex: 0 0 100%;
+    }
+}
+
+/* Template container with fixed height and scroll */
+.template-scroll-container {
+    height: 400px;
+    max-height: 60vh; /* 响应式高度限制 */
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
+/* Rule config container with scroll */
+.rule-config-container {
+    height: 400px;
+    max-height: 60vh; /* 响应式高度限制 */
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding-right: 0.5rem; /* 为滚动条留出空间 */
+}
+
+/* 自定义滚动条样式 */
+.template-scroll-container::-webkit-scrollbar,
+.rule-config-container::-webkit-scrollbar {
+    width: 6px;
+}
+
+.template-scroll-container::-webkit-scrollbar-track,
+.rule-config-container::-webkit-scrollbar-track {
+    background: var(--gray-100);
+    border-radius: 3px;
+}
+
+.template-scroll-container::-webkit-scrollbar-thumb,
+.rule-config-container::-webkit-scrollbar-thumb {
+    background: var(--primary-light);
+    border-radius: 3px;
+}
+
+.template-scroll-container::-webkit-scrollbar-thumb:hover,
+.rule-config-container::-webkit-scrollbar-thumb:hover {
+    background: var(--primary-color);
+}
+
+/* Template item styling specific to this page */
+.template-item {
+    cursor: pointer;
+    transition: all 0.3s ease;
+    border: 1px solid var(--gray-200); /* Default border color */
+    border-radius: 0.75rem; /* Consistent border-radius */
+    background-color: var(--white); /* Explicitly set white background */
+    padding: 0.75rem 1rem; /* Adjust padding for consistency with other elements */
+}
+
+.template-item:hover {
+    background-color: rgba(102, 102, 255, 0.05); /* Transparent primary color hover */
+    border-color: var(--primary-color) !important; /* Primary color border on hover */
+    box-shadow: 0 2px 8px rgba(102, 102, 255, 0.1); /* Subtle shadow on hover */
+}
+
+.template-item.selected {
+    background-color: rgba(102, 102, 255, 0.1); /* Slightly more transparent primary color on selected */
+    border-color: var(--primary-color) !important; /* Primary color border on selected */
+    box-shadow: 0 4px 16px rgba(102, 102, 255, 0.15); /* More pronounced shadow on selected */
+}
+
+/* Custom class for gradient buttons, consistent with previous page */
+.btn-gradient-primary {
+    background: linear-gradient(135deg, var(--primary-gradient-start) 0%, var(--primary-gradient-end) 100%) !important;
+    color: white !important;
+    border: none !important;
+    font-weight: 600 !important;
+    padding: 0.625rem 1.5rem !important; /* Consistent padding */
+    border-radius: 0.5rem !important; /* Consistent border-radius */
+    transition: all 0.3s ease !important;
+    box-shadow: 0 4px 12px rgba(102, 102, 255, 0.3) !important; /* Consistent shadow */
+}
+
+.btn-gradient-primary:hover {
+    transform: translateY(-2px) !important;
+    box-shadow: 0 8px 24px rgba(102, 102, 255, 0.4) !important;
+    background: linear-gradient(135deg, var(--primary-dark) 0%, var(--primary-color) 100%) !important; /* Slightly adjusted hover gradient for depth */
+}
+
+/* Table styling */
+.table {
+    border-collapse: separate; /* Allows border-radius on table */
+    border-spacing: 0;
+    border-radius: 0.75rem; /* Soften table corners */
+    overflow: hidden; /* Ensures border-radius is visible */
+    box-shadow: var(--shadow-sm); /* Subtle shadow for the table */
+}
+
+.table-responsive {
+    border-radius: 0.75rem; /* Apply border-radius to responsive container too */
+    overflow: hidden; /* Needed for inner table's border-radius */
+}
+
+.table-light {
+    background-color: var(--gray-100) !important; /* Light gray for table header */
+}
+
+.table thead th {
+    color: var(--gray-600); /* Darker text for table headers */
+    font-weight: 600;
+    padding: 0.75rem 1.25rem; /* Adjust padding */
+}
+
+.table tbody td {
+    color: var(--gray-700); /* Main text color for table cells */
+    padding: 0.75rem 1.25rem; /* Adjust padding */
+    vertical-align: middle;
+}
+
+.table-hover tbody tr:hover {
+    background-color: rgba(102, 102, 255, 0.05); /* Light hover effect for table rows */
+}
+
+/* Outline buttons */
+.btn-outline-primary {
+    color: var(--primary-color);
+    border-color: var(--primary-color);
+    transition: all 0.2s ease;
+}
+
+.btn-outline-primary:hover {
+    background-color: var(--primary-color);
+    color: var(--white) !important;
+    box-shadow: var(--shadow-sm);
+    transform: translateY(-1px);
+}
+
+.btn-outline-danger {
+    color: #FF6B6B; /* Consistent delete red from previous page's delete button */
+    border-color: #FF6B6B;
+    transition: all 0.2s ease;
+}
+
+.btn-outline-danger:hover {
+    background-color: #FF6B6B;
+    color: var(--white) !important;
+    box-shadow: var(--shadow-sm);
+    transform: translateY(-1px);
+}
+
+/* Alert styling within modal */
+.alert-info {
+    background-color: var(--primary-lighter); /* Use light primary for info alerts */
+    border-color: var(--primary-light);
+    color: var(--primary-dark);
+    font-weight: 500;
+    border-radius: 0.5rem;
+}
+
+/* Card styling */
+.card {
+    border-radius: 0.75rem !important; /* Consistent card border-radius */
+    box-shadow: var(--shadow) !important; /* Consistent card shadow */
+    border: 1px solid var(--gray-200) !important; /* Light border for cards */
+}
+</style>
+
+<script>
+let currentEditingRule = null;
+let ruleTemplates = [];
+
+// 页面加载时获取数据
+document.addEventListener('DOMContentLoaded', function() {
+    loadRules();
+    loadRuleTemplates();
+
+    // 设置表单提交处理
+    document.getElementById('ruleForm').addEventListener('submit', handleSaveRule);
+});
+
+// 加载测评规则列表
+async function loadRules() {
+    try {
+        const response = await fetch('/web/api/llm/rules');
+        const result = await response.json();
+
+        if (result.status === 'success') {
+            renderRules(result.data);
+        } else {
+            showAlert('获取测评规则列表失败', 'danger');
+        }
+    } catch (error) {
+        console.error('加载测评规则列表失败:', error);
+        showAlert('加载测评规则列表失败', 'danger');
+    }
+}
+
+// 加载规则模板
+async function loadRuleTemplates() {
+    try {
+        const response = await fetch('/web/api/llm/rules/templates');
+        const result = await response.json();
+
+        if (result.status === 'success') {
+            ruleTemplates = result.data;
+            renderTemplates(result.data);
+        } else {
+            console.warn('获取规则模板失败');
+            renderTemplates([]);
+        }
+    } catch (error) {
+        console.error('加载规则模板失败:', error);
+        renderTemplates([]);
+    }
+}
+
+// 渲染测评规则表格
+function renderRules(rules) {
+    const tbody = document.getElementById('rulesTableBody');
+
+    if (rules.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="4" class="text-center text-muted">
+                    <i class="bi bi-inbox"></i> 暂无测评规则
+                </td>
+            </tr>
+        `;
+        return;
+    }
+
+    tbody.innerHTML = rules.map(rule => `
+        <tr>
+            <td>
+                <div>
+                    <strong>${rule.name}</strong>
+                    <br>
+                    <small class="text-muted">${rule.description || '无描述'}</small>
+                </div>
+            </td>
+            <td>
+                <span class="badge bg-info">${rule.type}</span>
+            </td>
+            <td>${new Date(rule.modified_time).toLocaleString()}</td>
+            <td>
+                <button class="btn btn-sm btn-outline-success me-2" onclick="editRule('${rule.filename}')">
+                    <i class="bi bi-pencil"></i> 编辑
+                </button>
+                <button class="btn btn-sm btn-outline-primary me-2" onclick="downloadRule('${rule.filename}')">
+                    <i class="bi bi-download"></i> 下载
+                </button>
+                <button class="btn btn-sm btn-outline-danger" onclick="deleteRule('${rule.filename}')">
+                    <i class="bi bi-trash"></i> 删除
+                </button>
+            </td>
+        </tr>
+    `).join('');
+}
+
+// 渲染模板列表
+function renderTemplates(templates) {
+    const container = document.getElementById('templatesContainer');
+
+    if (templates.length === 0) {
+        container.innerHTML = `
+            <div class="text-center text-muted p-3">
+                <i class="bi bi-inbox"></i> 暂无模板
+            </div>
+        `;
+        return;
+    }
+
+    container.innerHTML = templates.map(template => `
+        <div class="template-item border rounded p-3 mb-2" onclick="selectTemplate('${template.filename}')">
+            <h6 class="mb-1">${template.name}</h6>
+            <div class="small text-muted mb-1">类型: ${template.type}</div>
+            <div class="small">${template.intro}</div>
+        </div>
+    `).join('');
+}
+
+// 选择模板
+function selectTemplate(templateFilename) {
+    const template = ruleTemplates.find(t => t.filename === templateFilename);
+    if (!template) return;
+
+    // 更新选中状态
+    document.querySelectorAll('.template-item').forEach(item => {
+        item.classList.remove('selected');
+    });
+    event.target.closest('.template-item').classList.add('selected');
+
+    // 填充表单
+    document.getElementById('ruleName').value = template.name;
+    document.getElementById('ruleType').value = template.type;
+    document.getElementById('ruleIntro').value = template.intro;
+
+    // 填充模型配置
+    const modelConfig = template.content?.model_config || {};
+    document.getElementById('modelName').value = modelConfig.name || 'Doubao-pro-32k';
+    document.getElementById('temperature').value = modelConfig.temperature || 0.3;
+
+    // 填充Prompt描述
+    const promptDescription = template.content?.evaluation_rule?.prompt?.role?.description || '';
+    document.getElementById('promptDescription').value = promptDescription;
+}
+
+// 显示创建规则弹窗
+function showCreateRuleModal() {
+    currentEditingRule = null;
+    document.getElementById('ruleModalTitle').textContent = '创建测评规则';
+    document.getElementById('ruleForm').reset();
+    document.getElementById('saveRuleBtn').textContent = '保存规则';
+
+    // 清除模板选中状态
+    document.querySelectorAll('.template-item').forEach(item => {
+        item.classList.remove('selected');
+    });
+
+    const modal = new bootstrap.Modal(document.getElementById('ruleModal'));
+    modal.show();
+}
+
+// 编辑规则
+async function editRule(filename) {
+    try {
+        const response = await fetch(`/web/api/llm/rules/${encodeURIComponent(filename)}`);
+        const result = await response.json();
+
+        if (result.status === 'success') {
+            const rule = result.data;
+            currentEditingRule = filename;
+
+            // 更新弹窗标题
+            document.getElementById('ruleModalTitle').textContent = '编辑测评规则';
+            document.getElementById('saveRuleBtn').textContent = '更新规则';
+
+            // 填充表单
+            document.getElementById('ruleName').value = rule.evaluation_rule?.name || '';
+            document.getElementById('ruleType').value = rule.evaluation_rule?.type || 'prompt';
+            document.getElementById('ruleIntro').value = rule.evaluation_rule?.intro || '';
+            document.getElementById('modelName').value = rule.model_config?.name || 'Doubao-pro-32k';
+            document.getElementById('temperature').value = rule.model_config?.temperature || 0.3;
+            document.getElementById('promptDescription').value = rule.evaluation_rule?.prompt?.role?.description || '';
+
+            // 显示弹窗
+            const modal = new bootstrap.Modal(document.getElementById('ruleModal'));
+            modal.show();
+        } else {
+            showAlert('获取规则详情失败', 'danger');
+        }
+    } catch (error) {
+        console.error('获取规则详情失败:', error);
+        showAlert('获取规则详情失败', 'danger');
+    }
+}
+
+// 处理保存规则
+async function handleSaveRule(event) {
+    event.preventDefault();
+
+    const formData = new FormData(event.target);
+
+    const saveBtn = document.getElementById('saveRuleBtn');
+    const originalText = saveBtn.textContent;
+    saveBtn.disabled = true;
+    saveBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> 保存中...';
+
+    try {
+        let url = '/web/api/llm/rules';
+        let method = 'POST';
+
+        // 如果是编辑模式
+        if (currentEditingRule) {
+            url = `/web/api/llm/rules/${encodeURIComponent(currentEditingRule)}`;
+            method = 'PUT';
+        }
+
+        const response = await fetch(url, {
+            method: method,
+            body: formData
+        });
+
+        const result = await response.json();
+
+        if (result.status === 'success') {
+            showAlert(currentEditingRule ? '规则更新成功' : '规则创建成功', 'success');
+            bootstrap.Modal.getInstance(document.getElementById('ruleModal')).hide();
+            loadRules(); // 重新加载列表
+        } else {
+            showAlert(result.message || '保存失败', 'danger');
+        }
+    } catch (error) {
+        console.error('保存规则失败:', error);
+        showAlert('保存失败', 'danger');
+    } finally {
+        saveBtn.disabled = false;
+        saveBtn.textContent = originalText;
+    }
+}
+
+// 下载规则
+function downloadRule(filename) {
+    window.open(`/web/api/llm/rules/${encodeURIComponent(filename)}/download`, '_blank');
+}
+
+// 删除规则
+async function deleteRule(filename) {
+    if (!confirm(`确定要删除规则"${filename}"吗？`)) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`/web/api/llm/rules/${encodeURIComponent(filename)}`, {
+            method: 'DELETE'
+        });
+
+        const result = await response.json();
+
+        if (result.status === 'success') {
+            showAlert('规则删除成功', 'success');
+            loadRules(); // 重新加载列表
+        } else {
+            showAlert(result.message || '删除失败', 'danger');
+        }
+    } catch (error) {
+        console.error('删除规则失败:', error);
+        showAlert('删除失败', 'danger');
+    }
+}
+
+// 显示提示消息
+function showAlert(message, type) {
+    const alert = document.createElement('div');
+    alert.className = `alert alert-${type} alert-dismissible fade show position-fixed`;
+    alert.style.cssText = 'top: 20px; right: 20px; z-index: 9999; min-width: 300px;';
+    alert.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+
+    document.body.appendChild(alert);
+
+    setTimeout(() => {
+        if (alert.parentNode) {
+            alert.parentNode.removeChild(alert);
+        }
+    }, 3000);
+}
+</script>
+{% endblock %}

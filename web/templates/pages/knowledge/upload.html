@@ -1,0 +1,1617 @@
+{% extends "base.html" %}
+
+{% block title %}知识库上传{% endblock %}
+
+{% block content %}
+<style>
+    .upload-container {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 20px;
+        background: white;
+        border-radius: 8px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+
+    .upload-header {
+        border-bottom: 2px solid #6666FF;
+        padding-bottom: 15px;
+        margin-bottom: 30px;
+    }
+
+    .upload-header h1 {
+        color: #6666FF;
+        margin: 0;
+        font-size: 24px;
+    }
+
+    .upload-steps {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 30px;
+        padding: 0 20px;
+    }
+
+    .step {
+        flex: 1;
+        text-align: center;
+        position: relative;
+    }
+
+    .step:not(:last-child)::after {
+        content: '';
+        position: absolute;
+        top: 15px;
+        right: -50%;
+        width: 100%;
+        height: 2px;
+        background: #e5e7eb;
+        z-index: 1;
+    }
+
+    .step.active::after {
+        background: #6666FF;
+    }
+
+    .step-circle {
+        width: 30px;
+        height: 30px;
+        border-radius: 50%;
+        background: #e5e7eb;
+        color: #9ca3af;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: bold;
+        position: relative;
+        z-index: 2;
+    }
+
+    .step.active .step-circle {
+        background: #6666FF;
+        color: white;
+    }
+
+    .step.completed .step-circle {
+        background: #5553FF;
+        color: white;
+    }
+
+    .step-label {
+        margin-top: 8px;
+        font-size: 14px;
+        color: #6b7280;
+    }
+
+    .step.active .step-label {
+        color: #6666FF;
+        font-weight: 500;
+    }
+
+    .upload-section {
+        margin-bottom: 30px;
+        display: none;
+    }
+
+    .upload-section.active {
+        display: block;
+    }
+
+    .form-group {
+        margin-bottom: 20px;
+    }
+
+    .form-label {
+        display: block;
+        margin-bottom: 8px;
+        font-weight: 500;
+        color: #404040;
+    }
+
+    .form-input, .form-select, .form-textarea {
+        width: 100%;
+        padding: 10px 12px;
+        border: 2px solid #e5e7eb;
+        border-radius: 6px;
+        font-size: 14px;
+        transition: border-color 0.2s;
+        box-sizing: border-box;
+    }
+
+    .form-input:focus, .form-select:focus, .form-textarea:focus {
+        outline: none;
+        border-color: #6666FF;
+    }
+
+    .form-textarea {
+        min-height: 100px;
+        resize: vertical;
+    }
+
+    .file-drop-zone {
+        border: 2px dashed #d1d5db;
+        border-radius: 8px;
+        padding: 40px;
+        text-align: center;
+        transition: all 0.2s;
+        cursor: pointer;
+    }
+
+    .file-drop-zone:hover {
+        border-color: #6666FF;
+        background: linear-gradient(135deg, #AAA9FF, #B5D5FF);
+        background-color: rgba(170, 169, 255, 0.1);
+    }
+
+    .file-drop-zone.dragover {
+        border-color: #6666FF;
+        background: linear-gradient(135deg, #AAA9FF, #B5D5FF);
+        background-color: rgba(170, 169, 255, 0.2);
+    }
+
+    .file-info {
+        background: #f9fafb;
+        border: 1px solid #e5e7eb;
+        border-radius: 6px;
+        padding: 15px;
+        margin-top: 15px;
+    }
+
+    .preview-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 15px;
+    }
+
+    .preview-table th,
+    .preview-table td {
+        border: 1px solid #e5e7eb;
+        padding: 8px 12px;
+        text-align: left;
+    }
+
+    .preview-table th {
+        background: #f9fafb;
+        font-weight: 500;
+    }
+
+    .template-options {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: 15px;
+        margin-bottom: 20px;
+    }
+
+    .template-card {
+        border: 2px solid #e5e7eb;
+        border-radius: 8px;
+        padding: 15px;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .template-card:hover {
+        border-color: #6666FF;
+        background: linear-gradient(135deg, rgba(170, 169, 255, 0.1), rgba(181, 213, 255, 0.1));
+    }
+
+    .template-card.selected {
+        border-color: #6666FF;
+        background: linear-gradient(135deg, rgba(170, 169, 255, 0.2), rgba(181, 213, 255, 0.2));
+    }
+
+    .template-name {
+        font-weight: 500;
+        color: #404040;
+        margin-bottom: 5px;
+    }
+
+    .template-desc {
+        font-size: 14px;
+        color: #6b7280;
+        margin-bottom: 10px;
+    }
+
+    .template-preview {
+        font-family: monospace;
+        font-size: 12px;
+        background: #f3f4f6;
+        padding: 8px;
+        border-radius: 4px;
+        color: #404040;
+    }
+
+    .btn {
+        padding: 10px 20px;
+        border: none;
+        border-radius: 6px;
+        font-size: 14px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.2s;
+        text-decoration: none;
+        display: inline-block;
+    }
+
+    .btn-primary {
+        background: linear-gradient(135deg, #6647A9, #5553FF);
+        color: white;
+        border: 1px solid #6666FF;
+    }
+
+    .btn-primary:hover {
+        background: linear-gradient(135deg, #5553FF, #4440E8);
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(102, 102, 255, 0.3);
+    }
+
+    .btn-secondary {
+        background: #f3f4f6;
+        color: #404040;
+        border: 1px solid #d1d5db;
+    }
+
+    .btn-secondary:hover {
+        background: #e5e7eb;
+        color: #374151;
+    }
+
+    .btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+
+    .progress-bar {
+        width: 100%;
+        height: 20px;
+        background: #e5e7eb;
+        border-radius: 10px;
+        overflow: hidden;
+        margin: 15px 0;
+    }
+
+    .progress-fill {
+        height: 100%;
+        background: linear-gradient(90deg, #6647A9, #5553FF);
+        width: 0%;
+        transition: width 0.3s;
+    }
+
+    .alert {
+        padding: 12px 16px;
+        border-radius: 6px;
+        margin-bottom: 20px;
+    }
+
+    .alert-success {
+        background: linear-gradient(135deg, rgba(170, 169, 255, 0.2), rgba(181, 213, 255, 0.2));
+        border: 1px solid #AAA9FF;
+        color: #404040;
+    }
+
+    .alert-error {
+        background: #fee2e2;
+        border: 1px solid #ef4444;
+        color: #991b1b;
+    }
+
+    .alert-warning {
+        background: #fef3c7;
+        border: 1px solid #f59e0b;
+        color: #92400e;
+    }
+
+    .result-summary {
+        background: #f9fafb;
+        border: 1px solid #e5e7eb;
+        border-radius: 8px;
+        padding: 20px;
+        margin-top: 20px;
+    }
+
+    .result-item {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 10px;
+    }
+
+    .result-item:last-child {
+        margin-bottom: 0;
+    }
+
+    .field-buttons {
+        margin-top: 10px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 5px;
+    }
+
+    .field-btn {
+        padding: 4px 8px;
+        border: 1px solid #6666FF;
+        border-radius: 4px;
+        background: white;
+        color: #6666FF;
+        font-size: 12px;
+        cursor: pointer;
+        transition: all 0.2s;
+        position: relative;
+    }
+
+    .field-btn:hover {
+        background: linear-gradient(135deg, #6647A9, #5553FF);
+        color: white;
+    }
+
+    .field-btn.copied {
+        background: linear-gradient(135deg, #AAA9FF, #B5D5FF);
+        border-color: #AAA9FF;
+        color: white;
+    }
+
+    .field-btn.copied::after {
+        content: ' ✓';
+    }
+
+    .progress-details {
+        font-size: 14px;
+        color: #6b7280;
+        margin-top: 5px;
+    }
+
+    @keyframes slideIn {
+        from {
+            transform: translateX(100%);
+            opacity: 0;
+        }
+        to {
+            transform: translateX(0);
+            opacity: 1;
+        }
+    }
+
+    @keyframes slideOut {
+        from {
+            transform: translateX(0);
+            opacity: 1;
+        }
+        to {
+            transform: translateX(100%);
+            opacity: 0;
+        }
+    }
+
+    /* 添加输入框验证状态样式 */
+    .form-input.valid {
+        border-color: #AAA9FF !important;
+    }
+
+    .form-input.invalid {
+        border-color: #ef4444 !important;
+    }
+
+    /* 优化临时消息样式 */
+    .temp-message {
+        position: fixed;
+        top: 80px;
+        right: 20px;
+        z-index: 10000;
+        min-width: 250px;
+        max-width: 400px;
+        padding: 12px 16px;
+        border-radius: 6px;
+        font-size: 14px;
+        font-weight: 500;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        backdrop-filter: blur(8px);
+    }
+
+    /* 确保字段按钮的层级合适 */
+    .field-buttons {
+        position: relative;
+        z-index: 1;
+    }
+
+    .field-btn {
+        padding: 4px 8px;
+        border: 1px solid #6666FF;
+        border-radius: 4px;
+        background: white;
+        color: #6666FF;
+        font-size: 12px;
+        cursor: pointer;
+        transition: all 0.2s;
+        position: relative;
+        user-select: none; /* 防止意外选中 */
+    }
+
+    .field-btn:hover {
+        background: linear-gradient(135deg, #6647A9, #5553FF);
+        color: white;
+        transform: translateY(-1px);
+        box-shadow: 0 2px 4px rgba(102, 102, 255, 0.2);
+    }
+
+    .field-btn.copied {
+        background: linear-gradient(135deg, #AAA9FF, #B5D5FF);
+        border-color: #AAA9FF;
+        color: white;
+        transform: scale(1.05);
+    }
+
+    .field-btn.copied::after {
+        content: ' ✓';
+        font-weight: bold;
+    }
+
+    /* 添加表格容器滚动条样式 */
+    .preview-table-container {
+        overflow: auto;
+        border: 1px solid #e5e7eb;
+        border-radius: 6px;
+        margin-top: 15px;
+        max-height: 400px; /* 限制最大高度 */
+    }
+
+    .preview-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 0; /* 移除原有的margin-top */
+        min-width: 600px; /* 确保表格有最小宽度 */
+    }
+
+    .preview-table th,
+    .preview-table td {
+        border: 1px solid #e5e7eb;
+        padding: 8px 12px;
+        text-align: left;
+        max-width: 200px; /* 限制单元格最大宽度 */
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        position: relative;
+    }
+
+    .preview-table th {
+        background: #f9fafb;
+        font-weight: 500;
+        position: sticky; /* 固定表头 */
+        top: 0;
+        z-index: 10;
+    }
+
+    /* 鼠标悬停显示完整内容 */
+    .preview-table td:hover {
+        white-space: normal;
+        word-wrap: break-word;
+        overflow: visible;
+        position: relative;
+        z-index: 20;
+        background: white;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+        border-color: #6666FF;
+    }
+
+    /* 滚动条样式优化 */
+    .preview-table-container::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+    }
+
+    .preview-table-container::-webkit-scrollbar-track {
+        background: #f1f5f9;
+        border-radius: 4px;
+    }
+
+    .preview-table-container::-webkit-scrollbar-thumb {
+        background: linear-gradient(135deg, #AAA9FF, #B5D5FF);
+        border-radius: 4px;
+    }
+
+    .preview-table-container::-webkit-scrollbar-thumb:hover {
+        background: linear-gradient(135deg, #6647A9, #5553FF);
+    }
+
+    /* 高级配置按钮样式 */
+    .advanced-config-btn {
+        font-size: 14px;
+        padding: 8px 16px;
+        border: 1px solid #d1d5db;
+        background: #f9fafb;
+        color: #404040;
+        transition: all 0.2s;
+    }
+
+    .advanced-config-btn:hover {
+        background: #f3f4f6;
+        border-color: #9ca3af;
+    }
+
+    .advanced-config-btn.active {
+        background: linear-gradient(135deg, #6647A9, #5553FF);
+        color: white;
+        border-color: #6666FF;
+    }
+
+    /* 字段错误提示样式 */
+    .field-error {
+        margin-top: 5px;
+        padding: 8px 12px;
+        background: #fef2f2;
+        border: 1px solid #fecaca;
+        border-radius: 4px;
+        color: #dc2626;
+        font-size: 14px;
+    }
+
+    /* 输入框错误状态 */
+    .form-input.field-invalid,
+    .form-textarea.field-invalid {
+        border-color: #dc2626 !important;
+        background-color: #fef2f2;
+    }
+
+    /* 高级配置图标动画 */
+    #advancedConfigIcon {
+        display: inline-block;
+        transition: transform 0.2s ease;
+        font-size: 12px;
+        margin-right: 5px;
+    }
+
+    #advancedConfigIcon.rotated {
+        transform: rotate(90deg);
+    }
+</style>
+
+<div class="upload-container">
+    <div class="upload-header">
+        <h1>知识库文档上传与向量化</h1>
+        <p>支持Excel (.xlsx, .xls)、CSV (.csv)和JSON (.json)格式文件</p>
+    </div>
+
+    <!-- 步骤指示器 -->
+    <div class="upload-steps">
+        <div class="step active" id="step1">
+            <div class="step-circle">1</div>
+            <div class="step-label">选择文件</div>
+        </div>
+        <div class="step" id="step2">
+            <div class="step-circle">2</div>
+            <div class="step-label">预览数据</div>
+        </div>
+        <div class="step" id="step3">
+            <div class="step-circle">3</div>
+            <div class="step-label">配置参数</div>
+        </div>
+        <div class="step" id="step4">
+            <div class="step-circle">4</div>
+            <div class="step-label">处理完成</div>
+        </div>
+    </div>
+
+    <!-- 步骤1: 选择文件 -->
+    <div class="upload-section active" id="section1">
+        <h3>步骤 1: 选择要上传的文件</h3>
+
+        <div class="file-drop-zone" id="fileDropZone">
+            <div>
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#7c3aed" stroke-width="2">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                    <polyline points="7,10 12,15 17,10"></polyline>
+                    <line x1="12" y1="15" x2="12" y2="3"></line>
+                </svg>
+            </div>
+            <h4>点击或拖拽文件到此处</h4>
+            <p>支持 Excel (.xlsx, .xls)、CSV (.csv)、JSON (.json) 格式</p>
+            <p>文件大小限制: 50MB</p>
+            <input type="file" id="fileInput" accept=".xlsx,.xls,.csv,.json" style="display: none;">
+        </div>
+
+        <div id="fileInfo" class="file-info" style="display: none;">
+            <h4>已选择文件:</h4>
+            <div id="fileDetails"></div>
+        </div>
+
+        <div style="text-align: right; margin-top: 20px;">
+            <button class="btn btn-primary" id="previewBtn" disabled>预览文件</button>
+        </div>
+    </div>
+
+    <!-- 步骤2: 预览数据 -->
+    <div class="upload-section" id="section2">
+        <h3>步骤 2: 预览文件数据</h3>
+
+        <div id="previewContent">
+            <!-- 预览内容将在这里显示 -->
+        </div>
+
+        <div style="text-align: right; margin-top: 20px;">
+            <button class="btn btn-secondary" id="backToFileBtn">返回选择文件</button>
+            <button class="btn btn-primary" id="configureBtn" style="margin-left: 10px;">配置参数</button>
+        </div>
+    </div>
+
+    <!-- 步骤3: 配置参数 - 修改这个部分 -->
+    <div class="upload-section" id="section3">
+        <h3>步骤 3: 配置向量化参数</h3>
+
+        <div class="form-group">
+            <label class="form-label">选择Embedding模板:</label>
+            <div id="templateOptions" class="template-options">
+                <!-- 模板选项将在这里显示 -->
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label class="form-label" for="customTemplate">自定义模板:</label>
+            <textarea id="customTemplate" class="form-textarea"
+                      placeholder="使用 {字段名} 格式引用数据字段，例如: 问题:{Question};答案:{Answer};"
+                      rows="3"></textarea>
+            <small style="color: #6b7280;">
+                可用字段: <span id="availableFields"></span>
+            </small>
+            <div id="customTemplateError" class="field-error" style="display: none;"></div>
+        </div>
+
+        <!-- 高级RAG配置按钮 -->
+        <div class="form-group">
+            <button type="button" id="advancedConfigBtn" class="btn btn-secondary advanced-config-btn">
+                <span id="advancedConfigIcon">▶</span> 高级RAG配置
+            </button>
+        </div>
+
+        <!-- Document模板 - 默认隐藏 -->
+        <div class="form-group" id="documentTemplateGroup" style="display: none;">
+            <label class="form-label" for="documentTemplate">Document模板:</label>
+            <textarea id="documentTemplate" class="form-textarea"
+                      placeholder="用于存储到document字段的模板，默认与Embedding模板相同"
+                      rows="3"></textarea>
+            <small style="color: #6b7280;">
+                Document模板用于存储原始文档内容，通常与Embedding模板相同
+            </small>
+            <div id="documentTemplateError" class="field-error" style="display: none;"></div>
+        </div>
+
+        <div class="form-group">
+            <label class="form-label" for="collectionName">Collection名称:</label>
+            <input type="text" id="collectionName" class="form-input"
+                   placeholder="自动生成，可手动修改"
+                   required>
+            <small style="color: #6b7280;">
+                只能包含字母、数字、下划线，用于存储向量化后的数据
+            </small>
+        </div>
+
+        <div class="form-group">
+            <label class="form-label" for="batchSize">批处理大小:</label>
+            <input type="number" id="batchSize" class="form-input"
+                   value="20" min="1" max="100" required>
+            <small style="color: #6b7280;">
+                <span id="batchSizeHint">每批处理的记录数，建议1-100，较大值可提高处理速度但消耗更多内存</span>
+            </small>
+        </div>
+
+        <div style="text-align: right; margin-top: 20px;">
+            <button class="btn btn-secondary" id="backToPreviewBtn">返回预览</button>
+            <button class="btn btn-primary" id="startProcessBtn" style="margin-left: 10px;">开始处理</button>
+        </div>
+    </div>
+
+
+    <!-- 步骤4: 处理结果 -->
+    <div class="upload-section" id="section4">
+        <h3>步骤 4: 处理结果</h3>
+
+        <div id="processingStatus" style="display: none;">
+            <div class="alert alert-warning">
+                <strong>正在处理...</strong> 请耐心等待，不要关闭页面
+            </div>
+            <div class="progress-bar">
+                <div class="progress-fill" id="progressFill"></div>
+            </div>
+            <div id="processingMessage" style="white-space: pre-line; line-height: 1.4;">准备开始处理...</div>
+        </div>
+
+
+        <div id="resultContent">
+            <!-- 处理结果将在这里显示 -->
+        </div>
+
+        <div style="text-align: right; margin-top: 20px;">
+            <button class="btn btn-secondary" id="uploadAnotherBtn" style="display: none;">上传其他文件</button>
+            <a href="/web/knowledge" class="btn btn-primary" style="margin-left: 10px;">查看知识库</a>
+        </div>
+    </div>
+</div>
+
+<script>
+    // 全局变量
+    let selectedFile = null;
+    let previewData = null;
+    let templates = [];
+    let selectedTemplate = null;
+    let currentTaskId = null;
+    let progressInterval = null;
+    let advancedConfigEnabled = false;
+
+    // DOM元素
+    const fileDropZone = document.getElementById('fileDropZone');
+    const fileInput = document.getElementById('fileInput');
+    const fileInfo = document.getElementById('fileInfo');
+    const fileDetails = document.getElementById('fileDetails');
+    const previewBtn = document.getElementById('previewBtn');
+    const previewContent = document.getElementById('previewContent');
+    const templateOptions = document.getElementById('templateOptions');
+    const customTemplate = document.getElementById('customTemplate');
+    const collectionName = document.getElementById('collectionName');
+    const batchSize = document.getElementById('batchSize');
+    const availableFields = document.getElementById('availableFields');
+    const documentTemplate = document.getElementById('documentTemplate');
+
+    // 初始化
+    document.addEventListener('DOMContentLoaded', function() {
+        initializeEventListeners();
+        loadTemplates();
+    });
+
+    function initializeEventListeners() {
+        // 文件拖拽上传
+        fileDropZone.addEventListener('click', () => fileInput.click());
+        fileDropZone.addEventListener('dragover', handleDragOver);
+        fileDropZone.addEventListener('dragleave', handleDragLeave);
+        fileDropZone.addEventListener('drop', handleDrop);
+
+        fileInput.addEventListener('change', handleFileSelect);
+
+        // 按钮事件
+        previewBtn.addEventListener('click', previewFile);
+        document.getElementById('backToFileBtn').addEventListener('click', () => showSection(1));
+        document.getElementById('configureBtn').addEventListener('click', () => showSection(3));
+        document.getElementById('backToPreviewBtn').addEventListener('click', () => showSection(2));
+        document.getElementById('startProcessBtn').addEventListener('click', startProcessing);
+        document.getElementById('uploadAnotherBtn').addEventListener('click', resetUpload);
+
+        document.getElementById('advancedConfigBtn').addEventListener('click', toggleAdvancedConfig);
+
+
+        collectionName.addEventListener('input', function() {
+            const validation = validateCollectionName(this.value);
+            const smallElement = this.parentElement.querySelector('small');
+
+            if (validation.valid) {
+                this.style.borderColor = '#10b981';
+                smallElement.style.color = '#10b981';
+                smallElement.textContent = '✓ Collection名称格式正确';
+            } else {
+                this.style.borderColor = '#ef4444';
+                smallElement.style.color = '#ef4444';
+                smallElement.textContent = validation.message;
+            }
+        });
+        // 模板选择
+        customTemplate.addEventListener('input', function() {
+            if (this.value.trim()) {
+                clearTemplateSelection();
+                // 只有在高级配置关闭时才自动同步到document模板
+                if (!advancedConfigEnabled) {
+                    documentTemplate.value = this.value;
+                }
+            }
+
+            // 验证字段并计算批处理大小
+            validateTemplateFields();
+            calculateBatchSize();
+            this.oldValue = this.value;
+        });
+
+        documentTemplate.addEventListener('input', function() {
+            validateTemplateFields();
+        });
+
+        // 批处理大小默认值
+        batchSize.value = '20';
+    }
+
+    function handleDragOver(e) {
+        e.preventDefault();
+        fileDropZone.classList.add('dragover');
+    }
+
+    function handleDragLeave(e) {
+        e.preventDefault();
+        fileDropZone.classList.remove('dragover');
+    }
+
+    function handleDrop(e) {
+        e.preventDefault();
+        fileDropZone.classList.remove('dragover');
+
+        const files = e.dataTransfer.files;
+        if (files.length > 0) {
+            handleFileSelect({ target: { files: files } });
+        }
+    }
+
+    function handleFileSelect(e) {
+        const files = e.target.files;
+        if (files.length === 0) return;
+
+        selectedFile = files[0];
+
+        // 验证文件类型
+        const allowedTypes = ['.xlsx', '.xls', '.csv', '.json'];
+        const fileExt = selectedFile.name.toLowerCase().substring(selectedFile.name.lastIndexOf('.'));
+
+        if (!allowedTypes.includes(fileExt)) {
+            showAlert('error', `不支持的文件类型: ${fileExt}，支持的类型: ${allowedTypes.join(', ')}`);
+            return;
+        }
+
+        // 验证文件大小
+        const maxSize = 50 * 1024 * 1024; // 50MB
+        if (selectedFile.size > maxSize) {
+            showAlert('error', `文件太大，限制为50MB，当前文件: ${(selectedFile.size / 1024 / 1024).toFixed(1)}MB`);
+            return;
+        }
+
+        // 显示文件信息
+        showFileInfo();
+        previewBtn.disabled = false;
+    }
+
+    function showFileInfo() {
+        fileDetails.innerHTML = `
+            <div class="result-item">
+                <span><strong>文件名:</strong></span>
+                <span>${selectedFile.name}</span>
+            </div>
+            <div class="result-item">
+                <span><strong>文件大小:</strong></span>
+                <span>${(selectedFile.size / 1024 / 1024).toFixed(2)} MB</span>
+            </div>
+            <div class="result-item">
+                <span><strong>文件类型:</strong></span>
+                <span>${selectedFile.type || '未知'}</span>
+            </div>
+            <div class="result-item">
+                <span><strong>最后修改:</strong></span>
+                <span>${new Date(selectedFile.lastModified).toLocaleString()}</span>
+            </div>
+        `;
+        fileInfo.style.display = 'block';
+    }
+
+    async function previewFile() {
+        try {
+            showLoading('预览文件中...');
+
+            const formData = new FormData();
+            formData.append('file', selectedFile);
+
+            const response = await fetch('/web/api/knowledge/upload/preview', {
+                method: 'POST',
+                body: formData
+            });
+
+            const result = await response.json();
+            hideLoading();
+
+            if (result.status === 'success') {
+                previewData = result.data;
+                showPreview();
+                showSection(2);
+            } else {
+                showAlert('error', result.message);
+            }
+        } catch (error) {
+            hideLoading();
+            showAlert('error', '预览文件失败: ' + error.message);
+        }
+    }
+
+    function showPreview() {
+        const data = previewData;
+
+        previewContent.innerHTML = `
+            <div class="file-info">
+                <h4>文件信息</h4>
+                <div class="result-item">
+                    <span><strong>总行数:</strong></span>
+                    <span>${data.total_rows}</span>
+                </div>
+                <div class="result-item">
+                    <span><strong>字段数:</strong></span>
+                    <span>${data.columns.length}</span>
+                </div>
+                <div class="result-item">
+                    <span><strong>字段名:</strong></span>
+                    <span>${data.columns.join(', ')}</span>
+                </div>
+            </div>
+
+            <h4>数据预览 (前${data.preview_rows}行)</h4>
+            <div class="preview-table-container">
+                <table class="preview-table">
+                    <thead>
+                        <tr>
+                            ${data.columns.map(col => `<th title="${col}">${col}</th>`).join('')}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${data.preview_data.map(row => `
+                            <tr>
+                                ${data.columns.map(col => {
+                                    const cellValue = row[col] || '';
+                                    return `<td title="${cellValue}">${cellValue}</td>`;
+                                }).join('')}
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            </div>
+        `;
+
+        // 更新可用字段显示为可复制按钮
+        updateAvailableFields(data.columns);
+
+        // 生成默认collection名称
+        generateDefaultCollectionName();
+
+        setTimeout(() => {
+            validateTemplateFields();
+            calculateBatchSize();
+        }, 100);
+    }
+
+
+    // 更新可用字段为按钮
+    function updateAvailableFields(columns) {
+        const fieldButtonsHtml = columns.map(col =>
+            `<button class="field-btn" onclick="copyFieldName('${col}', event)">{${col}}</button>`
+        ).join('');
+
+        availableFields.innerHTML = `
+            <div class="field-buttons">
+                ${fieldButtonsHtml}
+            </div>
+        `;
+    }
+
+
+    // 修复 copyFieldName 函数
+    async function copyFieldName(fieldName, event) {
+        try {
+            const textToCopy = `{${fieldName}}`;
+
+            // 检查是否支持现代clipboard API
+            if (navigator.clipboard && window.isSecureContext) {
+                await navigator.clipboard.writeText(textToCopy);
+            } else {
+                // 降级到传统方法
+                const textArea = document.createElement('textarea');
+                textArea.value = textToCopy;
+                textArea.style.position = 'fixed';
+                textArea.style.left = '-999999px';
+                textArea.style.top = '-999999px';
+                document.body.appendChild(textArea);
+                textArea.focus();
+                textArea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textArea);
+            }
+
+            // 视觉反馈
+            const btn = event.target;
+            btn.classList.add('copied');
+            setTimeout(() => {
+                btn.classList.remove('copied');
+            }, 1000);
+
+            showTemporaryMessage(`已复制: ${textToCopy}`, 'success');
+        } catch (err) {
+            console.error('复制失败:', err);
+            const textToCopy = `{${fieldName}}`; // 在 catch 块中重新定义
+
+            // 降级到手动复制提示
+            showTemporaryMessage(`请手动复制: ${textToCopy}`, 'warning');
+
+            // 选中按钮文本以便手动复制
+            const btn = event.target;
+            const range = document.createRange();
+            range.selectNodeContents(btn);
+            const selection = window.getSelection();
+            selection.removeAllRanges();
+            selection.addRange(range);
+        }
+    }
+
+
+    // 生成默认collection名称
+    function generateDefaultCollectionName() {
+        if (selectedFile) {
+            const today = new Date();
+            const dateStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+
+            // 获取文件名（无扩展名）并清理非法字符
+            let filename = selectedFile.name.replace(/\.[^/.]+$/, ""); // 移除扩展名
+
+            // 按照规则清理文件名：只保留 [a-zA-Z0-9._-]
+            filename = filename.replace(/[^a-zA-Z0-9._-]/g, '_');
+
+            // 确保开头和结尾是 [a-zA-Z0-9]
+            filename = filename.replace(/^[^a-zA-Z0-9]+/, ''); // 移除开头的非字母数字字符
+            filename = filename.replace(/[^a-zA-Z0-9]+$/, ''); // 移除结尾的非字母数字字符
+
+            // 如果清理后为空，使用默认名
+            if (!filename) {
+                filename = 'document';
+            }
+
+            // 生成完整名称
+            let defaultName = `${filename}_${dateStr}`;
+
+            // 确保总长度在3-512字符之间
+            if (defaultName.length < 3) {
+                defaultName = `doc_${dateStr}`;
+            } else if (defaultName.length > 512) {
+                // 截断文件名部分，保留日期
+                const maxFilenameLength = 512 - dateStr.length - 1; // -1 for underscore
+                filename = filename.substring(0, maxFilenameLength);
+                defaultName = `${filename}_${dateStr}`;
+            }
+
+            // 最终验证：确保符合完整规则
+            if (!/^[a-zA-Z0-9][a-zA-Z0-9._-]*[a-zA-Z0-9]$/.test(defaultName) && defaultName.length > 1) {
+                // 如果仍不符合规则，使用安全的默认名称
+                defaultName = `collection_${dateStr}`;
+            }
+
+            collectionName.value = defaultName;
+        }
+    }
+
+    function validateCollectionName(name) {
+        // 检查长度
+        if (name.length < 3 || name.length > 512) {
+            return {
+                valid: false,
+                message: 'Collection名称长度必须在3-512字符之间'
+            };
+        }
+
+        // 检查字符集和开头结尾规则
+        if (!/^[a-zA-Z0-9][a-zA-Z0-9._-]*[a-zA-Z0-9]$/.test(name)) {
+            return {
+                valid: false,
+                message: 'Collection名称只能包含字母、数字、点号、下划线、连字符，且必须以字母或数字开头和结尾'
+            };
+        }
+
+        return {
+            valid: true,
+            message: ''
+        };
+    }
+
+    async function loadTemplates() {
+        try {
+            const response = await fetch('/web/api/knowledge/templates');
+            const result = await response.json();
+
+            if (result.status === 'success') {
+                templates = result.data.templates;
+                renderTemplates();
+            }
+        } catch (error) {
+            console.error('加载模板失败:', error);
+        }
+    }
+
+    function renderTemplates() {
+        templateOptions.innerHTML = templates.map(template => `
+            <div class="template-card" data-template="${template.name}" onclick="selectTemplate('${template.name}')">
+                <div class="template-name">${template.name}</div>
+                <div class="template-desc">${template.description}</div>
+                ${template.template ? `<div class="template-preview">${template.template}</div>` : ''}
+            </div>
+        `).join('');
+    }
+
+    function selectTemplate(templateName) {
+        clearTemplateSelection();
+
+        const template = templates.find(t => t.name === templateName);
+        if (template) {
+            selectedTemplate = template;
+            document.querySelector(`[data-template="${templateName}"]`).classList.add('selected');
+
+            if (templateName !== '自定义模板') {
+                customTemplate.value = template.template;
+                // 只有在高级配置关闭时才自动同步
+                if (!advancedConfigEnabled) {
+                    documentTemplate.value = template.template;
+                }
+            } else {
+                customTemplate.value = '';
+                if (!advancedConfigEnabled) {
+                    documentTemplate.value = '';
+                }
+                customTemplate.focus();
+            }
+
+            // 验证字段并计算批处理大小
+            validateTemplateFields();
+            calculateBatchSize();
+        }
+    }
+
+
+    function clearTemplateSelection() {
+        document.querySelectorAll('.template-card').forEach(card => {
+            card.classList.remove('selected');
+        });
+        selectedTemplate = null;
+    }
+
+    async function startProcessing() {
+        const embeddingTemplate = customTemplate.value.trim();
+        const docTemplate = documentTemplate.value.trim();
+        const collection = collectionName.value.trim();
+        const batch = parseInt(batchSize.value);
+
+        // 验证参数
+        if (!embeddingTemplate) {
+            showAlert('error', '请选择或输入embedding模板');
+            return;
+        }
+
+        if (!docTemplate) {
+            showAlert('error', '请输入document模板');
+            return;
+        }
+
+        if (!collection) {
+            showAlert('error', '请输入collection名称');
+            return;
+        }
+
+        const validation = validateCollectionName(collection);
+        if (!validation.valid) {
+            showAlert('error', validation.message);
+            return;
+        }
+
+        if (batch < 1 || batch > 1000) {
+            showAlert('error', '批处理大小必须在1-1000之间');
+            return;
+        }
+
+        try {
+            showSection(4);
+            showProcessingStatus();
+
+            const formData = new FormData();
+            formData.append('file', selectedFile);
+            formData.append('embedding_template', embeddingTemplate);
+            formData.append('document_template', docTemplate);
+            formData.append('collection_name', collection);
+            formData.append('batch_size', batch);
+
+            // 创建任务
+            const response = await fetch('/web/api/knowledge/upload/process', {
+                method: 'POST',
+                body: formData
+            });
+
+            const result = await response.json();
+
+            if (result.status === 'success') {
+                currentTaskId = result.data.task_id;
+                startProgressPolling();
+            } else {
+                hideProcessingStatus();
+                showErrorResult(result.message, result.data);
+            }
+        } catch (error) {
+            hideProcessingStatus();
+            showErrorResult('处理失败: ' + error.message);
+        }
+    }
+
+    // 开始轮询进度
+    function startProgressPolling() {
+        if (!currentTaskId) return;
+
+        progressInterval = setInterval(async () => {
+            try {
+                const response = await fetch(`/web/api/knowledge/upload/progress/${currentTaskId}`);
+                const result = await response.json();
+
+                if (result.status === 'success') {
+                    updateProgressDisplay(result.data);
+
+                    // 检查是否完成
+                    if (result.data.status === 'completed') {
+                        stopProgressPolling();
+                        hideProcessingStatus();
+                        showSuccessResult(result.data.result);
+                        updateStep(4, 'completed');
+                    } else if (result.data.status === 'error') {
+                        stopProgressPolling();
+                        hideProcessingStatus();
+                        showErrorResult(result.data.error, result.data.result);
+                    }
+                }
+            } catch (error) {
+                console.error('轮询进度失败:', error);
+            }
+        }, 1000); // 每秒轮询一次
+    }
+
+    // 停止轮询进度
+    function stopProgressPolling() {
+        if (progressInterval) {
+            clearInterval(progressInterval);
+            progressInterval = null;
+        }
+    }
+
+    // 更新进度显示
+    function updateProgressDisplay(progressData) {
+        const progressFill = document.getElementById('progressFill');
+        const processingMessage = document.getElementById('processingMessage');
+
+        // 更新进度条
+        progressFill.style.width = progressData.progress_percent + '%';
+
+        // 更新文本信息
+        let messageText = `${progressData.stage} (${progressData.stage_number}/${progressData.total_stages})`;
+
+        if (progressData.total_batches > 0) {
+            messageText += `\n批次进度: ${progressData.current_batch}/${progressData.total_batches}`;
+        }
+
+        if (progressData.message) {
+            messageText += `\n${progressData.message}`;
+        }
+
+        processingMessage.innerHTML = messageText.replace(/\n/g, '<br>');
+    }
+
+
+    function showProcessingStatus() {
+        document.getElementById('processingStatus').style.display = 'block';
+
+        // 初始化显示
+        const progressFill = document.getElementById('progressFill');
+        const processingMessage = document.getElementById('processingMessage');
+
+        progressFill.style.width = '0%';
+        processingMessage.innerHTML = '正在创建任务...';
+    }
+
+    function showTemporaryMessage(message, type = 'info') {
+        const messageEl = document.createElement('div');
+        messageEl.className = `alert alert-${type}`;
+        messageEl.style.cssText = `
+            position: fixed;
+            top: 80px;
+            right: 20px;
+            z-index: 10000;
+            min-width: 250px;
+            max-width: 400px;
+            animation: slideIn 0.3s ease;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        `;
+        messageEl.textContent = message;
+
+        document.body.appendChild(messageEl);
+
+        setTimeout(() => {
+            messageEl.style.animation = 'slideOut 0.3s ease';
+            setTimeout(() => {
+                if (document.body.contains(messageEl)) {
+                    document.body.removeChild(messageEl);
+                }
+            }, 300);
+        }, 3000); // 延长显示时间到3秒
+    }
+
+
+    function hideProcessingStatus() {
+        document.getElementById('processingStatus').style.display = 'none';
+        stopProgressPolling();
+    }
+
+    function showSuccessResult(data) {
+        document.getElementById('resultContent').innerHTML = `
+            <div class="alert alert-success">
+                <strong>处理完成!</strong> 文件已成功向量化并存储到知识库
+            </div>
+
+            <div class="result-summary">
+                <h4>处理结果摘要</h4>
+                <div class="result-item">
+                    <span><strong>文件名:</strong></span>
+                    <span>${data.file_name}</span>
+                </div>
+                <div class="result-item">
+                    <span><strong>Collection:</strong></span>
+                    <span>${data.collection_name}</span>
+                </div>
+                <div class="result-item">
+                    <span><strong>总记录数:</strong></span>
+                    <span>${data.total_records}</span>
+                </div>
+                <div class="result-item">
+                    <span><strong>成功插入:</strong></span>
+                    <span>${data.inserted_records}</span>
+                </div>
+                <div class="result-item">
+                    <span><strong>批处理大小:</strong></span>
+                    <span>${data.batch_size}</span>
+                </div>
+                <div class="result-item">
+                    <span><strong>使用模板:</strong></span>
+                    <span style="font-family: monospace; background: #f3f4f6; padding: 2px 4px; border-radius: 2px;">${data.template_used}</span>
+                </div>
+            </div>
+        `;
+
+        document.getElementById('uploadAnotherBtn').style.display = 'inline-block';
+    }
+
+    function showErrorResult(message, data = null) {
+        let content = `
+            <div class="alert alert-error">
+                <strong>处理失败!</strong> ${message}
+            </div>
+        `;
+
+        if (data && data.available_fields) {
+            content += `
+                <div class="result-summary">
+                    <h4>可用字段</h4>
+                    <p>文件中包含以下字段，请检查您的模板是否正确引用:</p>
+                    <p><code>${data.available_fields.join(', ')}</code></p>
+                </div>
+            `;
+        }
+
+        document.getElementById('resultContent').innerHTML = content;
+        document.getElementById('uploadAnotherBtn').style.display = 'inline-block';
+    }
+
+    function showSection(sectionNumber) {
+        // 隐藏所有section
+        document.querySelectorAll('.upload-section').forEach(section => {
+            section.classList.remove('active');
+        });
+
+        // 显示指定section
+        document.getElementById(`section${sectionNumber}`).classList.add('active');
+
+        // 更新步骤状态
+        updateStep(sectionNumber, 'active');
+    }
+
+    function updateStep(stepNumber, status) {
+        // 重置所有步骤
+        for (let i = 1; i <= 4; i++) {
+            const step = document.getElementById(`step${i}`);
+            step.classList.remove('active', 'completed');
+
+            if (i < stepNumber) {
+                step.classList.add('completed');
+            } else if (i === stepNumber) {
+                step.classList.add(status);
+            }
+        }
+    }
+
+    function resetUpload() {
+        // 停止进度轮询
+        stopProgressPolling();
+
+        // 清理任务进度信息
+        if (currentTaskId) {
+            fetch(`/web/api/knowledge/upload/progress/${currentTaskId}`, {
+                method: 'DELETE'
+            }).catch(error => console.error('清理任务失败:', error));
+            currentTaskId = null;
+        }
+
+        selectedFile = null;
+        previewData = null;
+        selectedTemplate = null;
+
+        fileInput.value = '';
+        fileInfo.style.display = 'none';
+        previewBtn.disabled = true;
+        customTemplate.value = '';
+        documentTemplate.value = '';
+        collectionName.value = '';
+        batchSize.value = '20';
+
+        clearTemplateSelection();
+        showSection(1);
+
+        document.getElementById('uploadAnotherBtn').style.display = 'none';
+    }
+    window.addEventListener('beforeunload', function() {
+        stopProgressPolling();
+    });
+
+    function showAlert(type, message) {
+        const alertHtml = `
+            <div class="alert alert-${type}" style="margin-bottom: 20px;">
+                ${message}
+            </div>
+        `;
+
+        // 在当前活动section的顶部显示警告
+        const activeSection = document.querySelector('.upload-section.active');
+        activeSection.insertAdjacentHTML('afterbegin', alertHtml);
+
+        // 5秒后自动移除
+        setTimeout(() => {
+            const alert = activeSection.querySelector('.alert');
+            if (alert) alert.remove();
+        }, 5000);
+    }
+
+    function showLoading(message) {
+        // 简单的加载指示器实现
+        console.log('Loading:', message);
+    }
+
+    function hideLoading() {
+        console.log('Loading finished');
+    }
+    // 切换高级配置
+    function toggleAdvancedConfig() {
+        advancedConfigEnabled = !advancedConfigEnabled;
+
+        const btn = document.getElementById('advancedConfigBtn');
+        const icon = document.getElementById('advancedConfigIcon');
+        const documentGroup = document.getElementById('documentTemplateGroup');
+
+        if (advancedConfigEnabled) {
+            // 启用高级配置
+            btn.classList.add('active');
+            icon.classList.add('rotated');
+            icon.textContent = '▼';
+            documentGroup.style.display = 'block';
+
+            // 如果Document模板为空，复制自定义模板的内容
+            if (!documentTemplate.value.trim() && customTemplate.value.trim()) {
+                documentTemplate.value = customTemplate.value;
+            }
+        } else {
+            // 关闭高级配置
+            btn.classList.remove('active');
+            icon.classList.remove('rotated');
+            icon.textContent = '▶';
+            documentGroup.style.display = 'none';
+
+            // 自动同步Document模板与自定义模板
+            if (customTemplate.value.trim()) {
+                documentTemplate.value = customTemplate.value;
+            }
+        }
+    }
+
+    // 验证模板字段
+    function validateTemplateFields() {
+        if (!previewData || !previewData.columns) return;
+
+        const availableFields = previewData.columns;
+        const customTemplateValue = customTemplate.value;
+        const documentTemplateValue = documentTemplate.value;
+
+        // 验证自定义模板
+        const customValidation = validateTemplate(customTemplateValue, availableFields);
+        showFieldValidation('customTemplate', 'customTemplateError', customValidation);
+
+        // 验证Document模板（仅在高级配置启用时）
+        if (advancedConfigEnabled) {
+            const documentValidation = validateTemplate(documentTemplateValue, availableFields);
+            showFieldValidation('documentTemplate', 'documentTemplateError', documentValidation);
+        }
+    }
+
+    // 验证单个模板
+    function validateTemplate(templateValue, availableFields) {
+        if (!templateValue.trim()) {
+            return { valid: true, errors: [] };
+        }
+
+        // 提取模板中的字段引用
+        const fieldReferences = templateValue.match(/\{([^}]+)\}/g);
+        const errors = [];
+
+        if (fieldReferences) {
+            fieldReferences.forEach(ref => {
+                const fieldName = ref.slice(1, -1); // 移除 { 和 }
+                if (!availableFields.includes(fieldName)) {
+                    errors.push(fieldName);
+                }
+            });
+        }
+
+        return {
+            valid: errors.length === 0,
+            errors: errors
+        };
+    }
+
+    // 显示字段验证结果
+    function showFieldValidation(inputId, errorId, validation) {
+        const input = document.getElementById(inputId);
+        const errorDiv = document.getElementById(errorId);
+
+        if (validation.valid) {
+            input.classList.remove('field-invalid');
+            errorDiv.style.display = 'none';
+        } else {
+            input.classList.add('field-invalid');
+            errorDiv.style.display = 'block';
+            errorDiv.innerHTML = `引用的字段不存在: <strong>${validation.errors.join(', ')}</strong>`;
+        }
+    }
+
+    // 计算批处理大小
+    function calculateBatchSize() {
+        if (!previewData || !customTemplate.value.trim()) return;
+
+        const templateValue = customTemplate.value;
+        const previewDataRows = previewData.preview_data;
+
+        if (previewDataRows.length === 0) return;
+
+        // 找到每个字段的最长值
+        const fieldMaxLengths = {};
+        previewData.columns.forEach(column => {
+            fieldMaxLengths[column] = Math.max(
+                ...previewDataRows.map(row => String(row[column] || '').length)
+            );
+        });
+
+        // 计算模板替换后的最大长度
+        let maxTemplateLength = templateValue;
+
+        // 替换所有字段引用为最长的值
+        const fieldReferences = templateValue.match(/\{([^}]+)\}/g);
+        if (fieldReferences) {
+            fieldReferences.forEach(ref => {
+                const fieldName = ref.slice(1, -1);
+                if (fieldMaxLengths[fieldName] !== undefined) {
+                    // 用该字段最长的字符串替换
+                    const maxLength = fieldMaxLengths[fieldName];
+                    const replacementText = 'x'.repeat(maxLength); // 用x字符模拟最长文本
+                    maxTemplateLength = maxTemplateLength.replace(ref, replacementText);
+                }
+            });
+        }
+
+        // 计算建议的批处理大小
+        const estimatedTextLength = maxTemplateLength.length;
+        let suggestedBatchSize = Math.floor(10000 / Math.max(estimatedTextLength, 1));
+
+        // 限制范围
+        suggestedBatchSize = Math.max(1, Math.min(100, suggestedBatchSize));
+
+        // 更新批处理大小
+        const batchSizeInput = document.getElementById('batchSize');
+        batchSizeInput.value = suggestedBatchSize;
+
+        // 更新提示信息
+        const hintElement = document.getElementById('batchSizeHint');
+        hintElement.innerHTML = `
+            根据模板长度自动计算 (预估文本长度: ${estimatedTextLength}字符)<br>
+            每批处理的记录数，建议1-100，较大值可提高处理速度但消耗更多内存
+        `;
+    }
+</script>
+{% endblock %}

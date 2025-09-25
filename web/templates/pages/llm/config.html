@@ -1,0 +1,802 @@
+{% extends "base.html" %}
+
+{% block title %}
+大模型测评 - Kumi
+{% endblock %}
+
+{% block content %}
+<style>
+    /* 确保样式优先级 */
+    .llm-dashboard {
+        width: 100%;
+        padding: 0 3rem;
+        max-width: 1400px;
+        margin: 0 auto;
+    }
+
+    .llm-dashboard .nav-pills .nav-link.active {
+        background: linear-gradient(135deg, #6647A9 0%, #5553FF 100%);
+        color: white !important;
+        border: none;
+        box-shadow: 0 4px 12px rgba(102, 102, 255, 0.3);
+    }
+
+    .llm-dashboard .nav-pills .nav-link {
+        color: #6666FF;
+        margin: 0 10px;
+        font-weight: 500;
+        transition: all 0.3s ease;
+    }
+
+    .llm-dashboard .nav-pills .nav-link:hover {
+        background: linear-gradient(135deg, rgba(170, 169, 255, 0.2) 0%, rgba(181, 213, 255, 0.2) 100%);
+        color: #5553FF;
+    }
+
+    .llm-dashboard .cards-grid {
+        display: grid !important;
+        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)) !important;
+        gap: 2rem !important;
+        margin-bottom: 2rem !important;
+    }
+
+    .llm-dashboard .llm-card {
+        background: white !important;
+        border-radius: 12px !important;
+        box-shadow: 0 2px 8px rgba(102, 102, 255, 0.1) !important;
+        transition: all 0.3s ease !important;
+        border: 1px solid rgba(170, 169, 255, 0.2) !important;
+        min-height: 240px !important;
+        position: relative !important;
+        cursor: pointer !important;
+        z-index: 1 !important;
+    }
+
+    .llm-dashboard .llm-card:hover {
+        transform: translateY(-2px) !important;
+        box-shadow: 0 8px 24px rgba(102, 102, 255, 0.2) !important;
+        z-index: 2 !important;
+        border-color: rgba(102, 102, 255, 0.3) !important;
+    }
+
+    /* 新建模型功能卡片样式 */
+    .llm-dashboard .create-card {
+        display: flex !important;
+        background: linear-gradient(135deg, #6647A9 0%, #5553FF 100%) !important;
+        color: white !important;
+        overflow: hidden !important;
+        border: 2px dashed rgba(255, 255, 255, 0.3) !important;
+        min-height: 240px !important;
+    }
+
+    .llm-dashboard .create-card:hover {
+        box-shadow: 0 8px 24px rgba(102, 102, 255, 0.3) !important;
+        transform: translateY(-2px) !important;
+    }
+
+    .llm-dashboard .create-card .create-content {
+        flex: 1 !important;
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: center !important;
+        justify-content: center !important;
+        cursor: pointer !important;
+        transition: all 0.3s ease !important;
+        padding: 1rem !important;
+    }
+
+    .llm-dashboard .create-card .create-content:hover {
+        background-color: rgba(255, 255, 255, 0.1) !important;
+    }
+
+    .llm-dashboard .create-content .icon {
+        font-size: 2.5rem !important;
+        margin-bottom: 0.5rem !important;
+        color: rgba(255, 255, 255, 0.9) !important;
+    }
+
+    .llm-dashboard .create-content .title {
+        font-size: 1.1rem !important;
+        font-weight: 600 !important;
+        margin-bottom: 0.3rem !important;
+        color: white !important;
+    }
+
+    .llm-dashboard .create-content .subtitle {
+        font-size: 0.9rem !important;
+        opacity: 0.8 !important;
+        color: rgba(255, 255, 255, 0.8) !important;
+    }
+
+    /* 模型卡片样式 */
+    .llm-dashboard .model-card {
+        background: white !important;
+        display: flex !important;
+        flex-direction: column !important;
+        position: relative !important;
+        min-height: 240px !important;
+    }
+
+    .llm-dashboard .model-card .card-content {
+        flex: 1 !important;
+        padding: 1.5rem !important;
+        display: flex !important;
+        flex-direction: column !important;
+        background: white !important;
+        border-radius: 12px !important;
+        position: relative !important;
+        z-index: 1 !important;
+    }
+
+    .llm-dashboard .model-card .card-header {
+        display: flex !important;
+        align-items: flex-start !important;
+        gap: 1rem !important;
+        margin-bottom: 1rem !important;
+    }
+
+    .llm-dashboard .model-card .card-icon {
+        font-size: 1.8rem !important;
+        color: #6666FF !important;
+        flex-shrink: 0 !important;
+        margin-top: 0.2rem !important;
+    }
+
+    .llm-dashboard .model-card .card-text {
+        flex: 1 !important;
+        min-width: 0 !important;
+    }
+
+    .llm-dashboard .model-card .card-title {
+        font-size: 1.1rem !important;
+        font-weight: 600 !important;
+        color: #404040 !important;
+        margin-bottom: 0.3rem !important;
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+    }
+
+    .llm-dashboard .model-card .card-subtitle {
+        font-size: 0.8rem !important;
+        color: #AAA9FF !important;
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        margin-bottom: 0.2rem !important;
+    }
+
+    .llm-dashboard .model-card .card-details {
+        flex: 1 !important;
+        display: flex !important;
+        flex-direction: column !important;
+        gap: 0.3rem !important;
+    }
+
+    .llm-dashboard .model-card .detail-item {
+        font-size: 0.8rem !important;
+        color: #8B8B8B !important;
+        display: flex !important;
+        align-items: center !important;
+        gap: 0.5rem !important;
+    }
+
+    .llm-dashboard .model-card .detail-item i {
+        color: #AAA9FF !important;
+        width: 16px !important;
+        text-align: center !important;
+    }
+
+    .llm-dashboard .model-card .card-footer {
+        display: flex !important;
+        justify-content: space-between !important;
+        align-items: center !important;
+        margin-top: auto !important;
+        padding-top: 0.5rem !important;
+    }
+
+    .llm-dashboard .model-card .create-time {
+        font-size: 0.75rem !important;
+        color: #8B8B8B !important;
+    }
+
+    .llm-dashboard .model-card .status-badge {
+        background: linear-gradient(135deg, #AAA9FF 0%, #B5D5FF 100%) !important;
+        color: #5553FF !important;
+        padding: 0.2rem 0.6rem !important;
+        border-radius: 12px !important;
+        font-size: 0.7rem !important;
+        font-weight: 500 !important;
+    }
+
+    /* 底部操作区域 */
+    .llm-dashboard .model-card .bottom-area {
+        position: absolute !important;
+        bottom: 0 !important;
+        left: 0 !important;
+        right: 0 !important;
+        height: 40% !important;
+        pointer-events: none !important;
+        border-radius: 0 0 12px 12px !important;
+    }
+
+    /* 三点图标按钮 */
+    .llm-dashboard .model-card .more-btn {
+        position: absolute !important;
+        bottom: 0.75rem !important;
+        right: 0.75rem !important;
+        background: rgba(102, 102, 255, 0.8) !important;
+        border: none !important;
+        color: white !important;
+        border-radius: 50% !important;
+        width: 2rem !important;
+        height: 2rem !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        cursor: pointer !important;
+        opacity: 0 !important;
+        visibility: hidden !important;
+        transition: all 0.2s ease !important;
+        z-index: 15 !important;
+        pointer-events: auto !important;
+        box-shadow: 0 2px 8px rgba(102, 102, 255, 0.3) !important;
+    }
+
+    .llm-dashboard .model-card:hover .more-btn {
+        opacity: 1 !important;
+        visibility: visible !important;
+    }
+
+    .llm-dashboard .model-card .more-btn:hover {
+        background: #6666FF !important;
+        transform: scale(1.1) !important;
+        box-shadow: 0 4px 12px rgba(102, 102, 255, 0.4) !important;
+    }
+
+    /* 操作菜单容器 */
+    .llm-dashboard .menu-container {
+        position: absolute !important;
+        top: 100% !important;
+        right: 0 !important;
+        z-index: 100 !important;
+        pointer-events: none !important;
+    }
+
+    .llm-dashboard .menu-container.active {
+        pointer-events: auto !important;
+    }
+
+    /* 删除菜单 */
+    .llm-dashboard .action-menu {
+        background: white !important;
+        border: 1px solid rgba(170, 169, 255, 0.3) !important;
+        border-radius: 8px !important;
+        box-shadow: 0 8px 24px rgba(102, 102, 255, 0.15) !important;
+        padding: 0.5rem !important;
+        opacity: 0 !important;
+        visibility: hidden !important;
+        transform: translateY(-0.3rem) scale(0.95) !important;
+        transition: all 0.15s ease !important;
+        white-space: nowrap !important;
+        min-width: 130px !important;
+        margin-top: 0.5rem !important;
+        z-index: 101 !important;
+    }
+
+    .llm-dashboard .action-menu.show {
+        opacity: 1 !important;
+        visibility: visible !important;
+        transform: translateY(0) scale(1) !important;
+    }
+
+    .llm-dashboard .action-menu .menu-btn {
+        background: none !important;
+        border: none !important;
+        font-size: 0.85rem !important;
+        cursor: pointer !important;
+        padding: 0.6rem 0.75rem !important;
+        border-radius: 6px !important;
+        transition: all 0.15s ease !important;
+        display: flex !important;
+        align-items: center !important;
+        gap: 0.5rem !important;
+        width: 100% !important;
+        text-align: left !important;
+        font-weight: 500 !important;
+    }
+
+    .llm-dashboard .action-menu .menu-btn:hover {
+        background: linear-gradient(135deg, rgba(170, 169, 255, 0.1) 0%, rgba(181, 213, 255, 0.1) 100%) !important;
+    }
+
+    .llm-dashboard .action-menu .edit-btn {
+        color: #6666FF !important;
+        border-bottom: 1px solid rgba(170, 169, 255, 0.2) !important;
+        margin-bottom: 0.25rem !important;
+        padding-bottom: 0.75rem !important;
+    }
+
+    .llm-dashboard .action-menu .edit-btn:hover {
+        color: #5553FF !important;
+    }
+
+    .llm-dashboard .action-menu .delete-btn {
+        color: #FF6B6B !important;
+    }
+
+    .llm-dashboard .action-menu .delete-btn:hover {
+        color: #FF5252 !important;
+        background: rgba(255, 107, 107, 0.1) !important;
+    }
+
+    /* 响应式设计 */
+    @media (max-width: 768px) {
+        .llm-dashboard {
+            padding: 0 1.5rem !important;
+        }
+
+        .llm-dashboard .cards-grid {
+            grid-template-columns: 1fr !important;
+            gap: 1.5rem !important;
+        }
+    }
+</style>
+
+
+<div class="llm-dashboard">
+    <!-- 二级导航栏 -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <nav class="nav nav-pills justify-content-center">
+                <a class="nav-link active" href="/web/llm/config" data-page="config">配置被测大模型</a>
+                <a class="nav-link" href="/web/llm/upload-dataset" data-page="dataset">上传测评集</a>
+                <a class="nav-link" href="/web/llm/upload-rules" data-page="rules">创建测评规则</a>
+                <a class="nav-link" href="/web/llm/evaluation" data-page="evaluation">测评任务</a>
+            </nav>
+        </div>
+    </div>
+
+    <!-- 主体内容 -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title text-primary mb-4">配置被测大模型</h5>
+
+                    <!-- 模型卡片容器 -->
+                    <div class="cards-grid" id="modelsContainer">
+                        <!-- 新建模型卡片 -->
+                        <div class="llm-card create-card">
+                            <div class="create-content" onclick="showCreateModelModal()">
+                                <div class="icon"><i class="bi bi-plus-circle"></i></div>
+                                <div class="title">新建大模型</div>
+                                <div class="subtitle">点击添加新的大模型配置</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 创建模型弹窗 -->
+<div class="modal fade" id="createModelModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">新建大模型配置</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="createModelForm">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="modelUrl" class="form-label">URL</label>
+                        <input type="url" class="form-control" id="modelUrl" name="url" required placeholder="请输入API URL">
+                    </div>
+                    <div class="mb-3">
+                        <label for="modelApiKey" class="form-label">API-KEY</label>
+                        <input type="text" class="form-control" id="modelApiKey" name="api_key" required placeholder="请输入API密钥">
+                    </div>
+                    <div class="mb-3">
+                        <label for="modelName" class="form-label">NAME</label>
+                        <input type="text" class="form-control" id="modelName" name="name" required placeholder="请输入模型名称">
+                    </div>
+                    <div class="mb-3">
+                        <label for="modelDescription" class="form-label">描述（可选）</label>
+                        <textarea class="form-control" id="modelDescription" name="description" rows="2" placeholder="请输入模型描述"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="submit" class="btn text-white" style="background-color: #6666ff;">确定</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+<!-- 编辑模型弹窗 -->
+<div class="modal fade" id="editModelModal" tabindex="-1" aria-labelledby="editModelModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="editModelModalLabel">编辑大模型配置</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form id="editModelForm">
+                <div class="modal-body">
+                    <input type="hidden" id="editModelId" name="id"> <!-- 隐藏域，用于传递模型ID -->
+                    <div class="mb-3">
+                        <label for="editModelUrl" class="form-label">URL</label>
+                        <input type="url" class="form-control" id="editModelUrl" name="url" required placeholder="请输入API URL">
+                    </div>
+                    <div class="mb-3">
+                        <label for="editModelApiKey" class="form-label">API-KEY</label>
+                        <input type="text" class="form-control" id="editModelApiKey" name="api_key" required placeholder="请输入API密钥">
+                    </div>
+                    <div class="mb-3">
+                        <label for="editModelName" class="form-label">NAME</label>
+                        <input type="text" class="form-control" id="editModelName" name="name" required placeholder="请输入模型名称">
+                    </div>
+                    <div class="mb-3">
+                        <label for="editModelDescription" class="form-label">描述（可选）</label>
+                        <textarea class="form-control" id="editModelDescription" name="description" rows="2" placeholder="请输入模型描述"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="submit" class="btn text-white" style="background-color: #6666ff;">保存</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+<script>
+// 全局变量，用于存储已加载的模型列表
+let allModels = [];
+
+// 页面加载时获取模型列表
+document.addEventListener('DOMContentLoaded', function() {
+    loadModels();
+
+    // 设置创建表单提交处理
+    document.getElementById('createModelForm').addEventListener('submit', handleCreateModel);
+
+    // 设置编辑表单提交处理
+    document.getElementById('editModelForm').addEventListener('submit', handleEditModel);
+});
+
+// 加载模型列表
+async function loadModels() {
+    try {
+        const response = await fetch('/web/api/llm/models');
+        const result = await response.json();
+
+        if (result.status === 'success') {
+            allModels = result.data; // 将获取到的模型数据存储到全局变量
+            renderModels(allModels);
+        } else {
+            showAlert('获取模型列表失败', 'danger');
+        }
+    } catch (error) {
+        console.error('加载模型列表失败:', error);
+        showAlert('加载模型列表失败', 'danger');
+    }
+}
+
+// 渲染模型卡片
+function renderModels(models) {
+    const container = document.getElementById('modelsContainer');
+    const createCard = container.children[0]; // 保存新建卡片
+
+    // 清除现有的模型卡片
+    container.innerHTML = '';
+    container.appendChild(createCard);
+
+    // 添加模型卡片
+    models.forEach(model => {
+        const modelCard = createModelCard(model);
+        container.appendChild(modelCard);
+    });
+}
+
+// 创建模型卡片
+function createModelCard(model) {
+    const card = document.createElement('div');
+    card.className = 'llm-card model-card';
+
+    // 安全地处理API key显示
+    const apiKeyDisplay = model.api_key ? model.api_key.substring(0, 8) + '***' : '未配置';
+
+    card.innerHTML = `
+        <div class="card-content">
+            <div class="card-header">
+                <div class="card-icon">
+                    <i class="bi bi-cpu"></i>
+                </div>
+                <div class="card-text">
+                    <div class="card-title" title="${model.name || '未命名'}">${model.name || '未命名'}</div>
+                    <div class="card-subtitle" title="${model.url || '未配置'}">${model.url || '未配置'}</div>
+                </div>
+            </div>
+            <div class="card-details">
+                <div class="detail-item">
+                    <i class="bi bi-key"></i>
+                    <span>${apiKeyDisplay}</span>
+                </div>
+                ${model.description ? `
+                <div class="detail-item">
+                    <i class="bi bi-info-circle"></i>
+                    <span>${model.description}</span>
+                </div>
+                ` : ''}
+            </div>
+            <div class="card-footer">
+                <div class="create-time">
+                    ${model.created_at ? new Date(model.created_at).toLocaleDateString() : '未知'}
+                </div>
+                <div class="status-badge">活跃</div>
+            </div>
+        </div>
+        <div class="bottom-area"></div>
+        <button class="more-btn" data-model="${model.id}">
+            <i class="bi bi-three-dots"></i>
+        </button>
+        <div class="menu-container" data-menu="${model.id}">
+            <div class="action-menu">
+                <button class="menu-btn edit-btn" data-action="edit" data-model="${model.id}">
+                    <i class="bi bi-pencil"></i>
+                    编辑配置
+                </button>
+                <button class="menu-btn delete-btn" data-action="delete" data-model="${model.id}" data-name="${model.name || '未命名'}">
+                    <i class="bi bi-trash"></i>
+                    删除模型
+                </button>
+            </div>
+        </div>
+    `;
+
+    // 设置事件监听
+    setupCardEvents(card, model);
+
+    return card;
+}
+
+// 设置卡片事件
+function setupCardEvents(card, model) {
+    const moreBtn = card.querySelector('.more-btn');
+    const menuContainer = card.querySelector('.menu-container');
+    const actionMenu = card.querySelector('.action-menu');
+
+    // 卡片点击事件（排除操作按钮区域）
+    card.addEventListener('click', function(e) {
+        if (!e.target.closest('.more-btn') && !e.target.closest('.menu-container')) {
+            // 这里可以添加卡片点击后的操作，比如查看详情
+            console.log('查看模型详情:', model.name);
+        }
+    });
+
+    // 三点按钮点击事件
+    moreBtn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        toggleMenu(menuContainer, actionMenu);
+    });
+
+    // 菜单按钮点击事件
+    card.querySelectorAll('.menu-btn').forEach(btn => {
+        btn.addEventListener('click', function(e) {
+            e.stopPropagation();
+            const action = this.dataset.action;
+            const modelId = this.dataset.model;
+
+            if (action === 'edit') {
+                editModel(modelId);
+            } else if (action === 'delete') {
+                const modelName = this.dataset.name;
+                deleteModel(modelId, modelName);
+            }
+        });
+    });
+
+    // 鼠标离开卡片和菜单区域时隐藏菜单
+    let leaveTimer;
+
+    function handleMouseLeave() {
+        leaveTimer = setTimeout(() => {
+            hideMenu(menuContainer, actionMenu);
+        }, 150);
+    }
+
+    function handleMouseEnter() {
+        if (leaveTimer) {
+            clearTimeout(leaveTimer);
+        }
+    }
+
+    card.addEventListener('mouseleave', handleMouseLeave);
+    card.addEventListener('mouseenter', handleMouseEnter);
+    menuContainer.addEventListener('mouseleave', handleMouseLeave);
+    menuContainer.addEventListener('mouseenter', handleMouseEnter);
+}
+
+// 切换菜单显示
+function toggleMenu(menuContainer, actionMenu) {
+    // 先隐藏其他所有菜单
+    document.querySelectorAll('.menu-container').forEach(container => {
+        if (container !== menuContainer) {
+            container.classList.remove('active');
+            container.querySelector('.action-menu').classList.remove('show');
+        }
+    });
+
+    // 切换当前菜单
+    const isShowing = actionMenu.classList.contains('show');
+    if (isShowing) {
+        hideMenu(menuContainer, actionMenu);
+    } else {
+        showMenu(menuContainer, actionMenu);
+    }
+}
+
+// 显示菜单
+function showMenu(menuContainer, actionMenu) {
+    menuContainer.classList.add('active');
+    actionMenu.classList.add('show');
+}
+
+// 隐藏菜单
+function hideMenu(menuContainer, actionMenu) {
+    menuContainer.classList.remove('active');
+    actionMenu.classList.remove('show');
+}
+
+// 编辑模型
+function editModel(modelId) {
+    // 隐藏菜单
+    document.querySelectorAll('.menu-container').forEach(container => {
+        container.classList.remove('active');
+        container.querySelector('.action-menu').classList.remove('show');
+    });
+
+    const modelToEdit = allModels.find(model => model.id === modelId);
+    if (modelToEdit) {
+        showEditModelModal(modelToEdit);
+    } else {
+        showAlert('模型未找到', 'danger');
+        console.error('模型未找到:', modelId);
+    }
+}
+
+// 显示创建模型弹窗
+function showCreateModelModal() {
+    const modal = new bootstrap.Modal(document.getElementById('createModelModal'));
+    modal.show();
+}
+
+// 处理创建模型表单提交
+async function handleCreateModel(event) {
+    event.preventDefault();
+
+    const formData = new FormData(event.target);
+
+    try {
+        const response = await fetch('/web/api/llm/models', {
+            method: 'POST',
+            body: formData
+        });
+
+        const result = await response.json();
+
+        if (result.status === 'success') {
+            showAlert('模型配置创建成功', 'success');
+            bootstrap.Modal.getInstance(document.getElementById('createModelModal')).hide();
+            event.target.reset();
+            loadModels(); // 重新加载模型列表
+        } else {
+            showAlert(result.message || '创建失败', 'danger');
+        }
+    } catch (error) {
+        console.error('创建模型配置失败:', error);
+        showAlert('创建失败', 'danger');
+    }
+}
+
+// 显示编辑模型弹窗
+function showEditModelModal(model) {
+    // 填充表单字段
+    document.getElementById('editModelId').value = model.id;
+    document.getElementById('editModelUrl').value = model.url;
+    document.getElementById('editModelApiKey').value = model.api_key;
+    document.getElementById('editModelName').value = model.name;
+    document.getElementById('editModelDescription').value = model.description;
+
+    const modal = new bootstrap.Modal(document.getElementById('editModelModal'));
+    modal.show();
+}
+
+// 新增：处理编辑模型表单提交
+async function handleEditModel(event) {
+    event.preventDefault();
+
+    const formData = new FormData(event.target);
+    const modelId = formData.get('id'); // 从隐藏域获取模型ID
+
+    try {
+        const response = await fetch(`/web/api/llm/models/${modelId}`, {
+            method: 'PUT', // 使用 PUT 方法进行更新
+            body: formData
+        });
+
+        const result = await response.json();
+
+        if (result.status === 'success') {
+            showAlert('模型配置更新成功', 'success');
+            bootstrap.Modal.getInstance(document.getElementById('editModelModal')).hide();
+            event.target.reset(); // 重置表单
+            loadModels(); // 重新加载模型列表以显示更新
+        } else {
+            showAlert(result.message || '更新失败', 'danger');
+        }
+    } catch (error) {
+        console.error('更新模型配置失败:', error);
+        showAlert('更新失败', 'danger');
+    }
+}
+
+
+// 删除模型
+async function deleteModel(modelId, modelName) {
+    if (!confirm(`确定要删除模型 "${modelName}" 吗？\n\n此操作不可撤销，将永久删除相关配置。`)) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`/web/api/llm/models/${modelId}`, {
+            method: 'DELETE'
+        });
+
+        const result = await response.json();
+
+        if (result.status === 'success') {
+            showAlert('模型配置删除成功', 'success');
+            loadModels(); // 重新加载模型列表
+        } else {
+            showAlert(result.message || '删除失败', 'danger');
+        }
+    } catch (error) {
+        console.error('删除模型配置失败:', error);
+        showAlert('删除失败', 'danger');
+    }
+
+    // 隐藏菜单
+    document.querySelectorAll('.menu-container').forEach(container => {
+        container.classList.remove('active');
+        container.querySelector('.action-menu').classList.remove('show');
+    });
+}
+
+// 显示提示消息
+function showAlert(message, type) {
+    // 创建提示元素
+    const alert = document.createElement('div');
+    alert.className = `alert alert-${type} alert-dismissible fade show position-fixed`;
+    alert.style.cssText = 'top: 20px; right: 20px; z-index: 9999; min-width: 300px;';
+    alert.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+
+    document.body.appendChild(alert);
+
+    // 3秒后自动移除
+    setTimeout(() => {
+        if (alert.parentNode) {
+            alert.parentNode.removeChild(alert);
+        }
+    }, 3000);
+}
+</script>
+
+{% endblock %}
+

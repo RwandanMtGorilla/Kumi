@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h1 class="h2 mb-4 text-center">欢迎使用 Kumi</h1>
+        <p class="lead text-muted mb-5 text-center">知识库与大模型评测平台</p>
+
+        <div class="row justify-content-center">
+            <div class="col-lg-5 col-md-6 mb-4">
+                <div class="card h-100">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="card-title mb-0 text-center">
+                            <i class="bi bi-book me-2"></i>知识库管理
+                        </h5>
+                    </div>
+                    <div class="card-body text-center">
+                        <p class="card-text">管理你的知识库，包括连接、设置嵌入模型、上传文件和测试功能。</p>
+                        <a href="#" class="btn btn-primary" data-page="knowledge">开始使用</a>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-5 col-md-6 mb-4">
+                <div class="card h-100">
+                    <div class="card-header bg-success text-white">
+                        <h5 class="card-title mb-0 text-center">
+                            <i class="bi bi-cpu me-2"></i>大模型评测
+                        </h5>
+                    </div>
+                    <div class="card-body text-center">
+                        <p class="card-text">配置和测试大语言模型，上传测评数据集，执行评测任务。</p>
+                        <a href="#" class="btn btn-success" data-page="llm/config">开始使用</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row mt-5">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0 text-center">
+                            <i class="bi bi-graph-up me-2"></i>系统状态
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-3 col-sm-6 text-center mb-3">
+                                <div class="bg-light rounded p-3">
+                                    <i class="bi bi-database text-primary" style="font-size: 2rem;"></i>
+                                    <h6 class="mt-2 mb-0">知识库</h6>
+                                    <small class="text-muted">运行正常</small>
+                                </div>
+                            </div>
+                            <div class="col-md-3 col-sm-6 text-center mb-3">
+                                <div class="bg-light rounded p-3">
+                                    <i class="bi bi-cpu text-success" style="font-size: 2rem;"></i>
+                                    <h6 class="mt-2 mb-0">大模型</h6>
+                                    <small class="text-muted">运行正常</small>
+                                </div>
+                            </div>
+                            <div class="col-md-3 col-sm-6 text-center mb-3">
+                                <div class="bg-light rounded p-3">
+                                    <i class="bi bi-cloud-upload text-info" style="font-size: 2rem;"></i>
+                                    <h6 class="mt-2 mb-0">文件服务</h6>
+                                    <small class="text-muted">运行正常</small>
+                                </div>
+                            </div>
+                            <div class="col-md-3 col-sm-6 text-center mb-3">
+                                <div class="bg-light rounded p-3">
+                                    <i class="bi bi-speedometer2 text-warning" style="font-size: 2rem;"></i>
+                                    <h6 class="mt-2 mb-0">评测服务</h6>
+                                    <small class="text-muted">运行正常</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
