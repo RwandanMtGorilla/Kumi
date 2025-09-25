@@ -1,5 +1,7 @@
 # KUMI
-项目目标: dify/coze 等工作流搭建平台的补充工具
+项目目标: 可视化的知识库测试；dify/coze 等工作流搭建平台的补充工具
+
+![front_end_test.png](images/front_end_test.png)
 
 ## 功能:
 1. 更自由化的知识库构建（清洗 切分） 暴露api接口给平台调用
