@@ -1,0 +1,8 @@
+/.venv/
+/config/.env
+
+/scripts/file_process/resources/
+/scripts/sql_scripts/resources/
+/scripts/sql_scripts/logs/
+/storage/
+/output/

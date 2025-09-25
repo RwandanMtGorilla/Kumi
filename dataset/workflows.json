@@ -1,0 +1,31 @@
+{
+  "workflows": [
+    {
+      "id": "chatbot_v1",
+      "name": "智能客服",
+      "url": "http://10.******/v1/chat-messages",
+      "api_key": "app-Os8****nppJFa",
+      "description": "智能客服",
+      "created_at": "2024-01-01T10:00:00Z",
+      "status": "active"
+    },
+    {
+      "id": "model_2",
+      "name": "文旅问答助手",
+      "url": "https://www.a1.com",
+      "api_key": "1",
+      "description": "1",
+      "created_at": "2025-08-27T17:34:34.041561",
+      "status": "active"
+    },
+    {
+      "id": "model_3",
+      "name": "blood_test_llm",
+      "url": "http://*****:5756/v1",
+      "api_key": "app-l1j13****",
+      "description": "",
+      "created_at": "2025-09-07T21:48:12.978720",
+      "status": "active"
+    }
+  ]
+}
