@@ -28,6 +28,7 @@ cp settings/.env.example settings/.env
 
 # 先等chroma和向量化 都启动了再执行这步
 uv run scripts/start_dev.py
+# 随后访问 127.0.0.1:8000 以访问Kumi界面
 ```
 
 ### 启动chroma
@@ -69,7 +70,7 @@ uv run embedding-api-qwen3_ST.py
 
 ## 讨论群
 
-![wechat_image_10-2.jpg](images/wechat_image_10-2.jpg)
+![wechat_image_10-13.jpg](images/wechat_image_10-2.jpg)
 
 ## 代码结构
 ```md
