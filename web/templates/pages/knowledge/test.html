@@ -546,52 +546,244 @@
         cursor: not-allowed;
     }
 
+    /* Collection多选相关样式 */
+.collection-container {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.collection-select-row {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+}
+
+.collection-select-row select {
+    flex: 1;
+    padding: 8px;
+    border: 1px solid #ced4da;
+    border-radius: 4px;
+    font-size: 12px;
+    transition: border-color 0.2s ease;
+    background: white;
+}
+
+.collection-select-row select:focus {
+    outline: none;
+    border-color: #6666FF;
+    box-shadow: 0 0 0 2px rgba(102, 102, 255, 0.1);
+}
+
+.btn-add-collection,
+.btn-remove-collection {
+    width: 32px;
+    height: 32px;
+    min-width: 32px;
+    flex-shrink: 0;
+    border: 1px solid #ced4da;
+    background: white;
+    border-radius: 4px;
+    font-size: 16px;
+    font-weight: bold;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+    color: #495057;
+    padding: 0;
+}
+
+.btn-add-collection:hover {
+    background: #6666FF;
+    border-color: #6666FF;
+    color: white;
+}
+
+.btn-remove-collection {
+    color: #dc3545;
+    border-color: #dc3545;
+}
+
+.btn-remove-collection:hover {
+    background: #dc3545;
+    border-color: #dc3545;
+    color: white;
+}
+
+.btn-add-collection:active,
+.btn-remove-collection:active {
+    transform: scale(0.95);
+}
+
+/* 矩阵按钮表格样式 */
+.matrix-button-table-container {
+    overflow-x: auto;
+    margin: 8px 0;
+}
+
+.matrix-button-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 11px;
+}
+
+.matrix-button-table th,
+.matrix-button-table td {
+    border: 1px solid #dee2e6;
+    padding: 4px;
+    text-align: center;
+    vertical-align: middle;
+}
+
+.matrix-button-table th {
+    background: #f8f9fa;
+    font-weight: 600;
+    color: #495057;
+    white-space: nowrap;
+}
+
+.matrix-button-table th:first-child {
+    background: white;
+    border: none;
+}
+
+.matrix-button-table td:first-child {
+    background: #f8f9fa;
+    font-weight: 600;
+    color: #495057;
+    white-space: nowrap;
+}
+
+.matrix-selection-btn {
+    width: 100%;
+    min-width: 60px;
+    height: 32px;
+    border: 2px solid #dee2e6;
+    background: white;
+    border-radius: 4px;
+    font-size: 10px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    color: #495057;
+    padding: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.matrix-selection-btn:hover {
+    background: #f8f9fa;
+    border-color: #6666FF;
+}
+
+.matrix-selection-btn.selected {
+    background: #6666FF;
+    color: white;
+    border-color: #6666FF;
+    font-weight: 600;
+}
+
+.matrix-selection-btn.selected-secondary {
+    background: #dc3545;
+    color: white;
+    border-color: #dc3545;
+    font-weight: 600;
+}
+
+.matrix-selection-btn.difference {
+    background: linear-gradient(135deg, #6666FF 50%, #dc3545 50%);
+    color: white;
+    border-color: #6666FF;
+    font-weight: 600;
+}
+
+.matrix-selection-info {
+    margin-top: 8px;
+    padding: 8px;
+    background: #f8f9fa;
+    border-radius: 4px;
+    font-size: 11px;
+}
+
+.info-text {
+    color: #495057;
+    line-height: 1.4;
+}
+
+
 </style>
 
 <div class="test-container">
     <div class="main-layout">
         <!-- 左侧控制面板 -->
         <div class="sidebar">
-            <!-- 数据源配置 -->
-            <div class="control-panel">
-                <div class="control-section">
-                    <div class="section-title">数据源配置</div>
+            <!-- 数据源配置部分 -->
+<div class="control-panel">
+    <div class="control-section">
+        <div class="section-title">数据源配置</div>
 
-                    <div class="control-group">
-                        <label for="xCollection">横坐标 Collection</label>
-                        <select id="xCollection">
-                            <option value="">请选择...</option>
-                        </select>
-                        <div class="required-error" id="xCollectionError">请选择横坐标 Collection</div>
-                    </div>
-
-                    <div class="control-group">
-                        <label for="xMaxItems">横坐标最大项目数</label>
-                        <input type="number" id="xMaxItems" min="10" max="500" value="30">
-                    </div>
-
-                    <div class="control-group">
-                        <label for="yCollection">纵坐标 Collection</label>
-                        <select id="yCollection">
-                            <option value="">请选择...</option>
-                        </select>
-                        <div class="required-error" id="yCollectionError">请选择纵坐标 Collection</div>
-                    </div>
-
-                    <div class="control-group">
-                        <label for="yMaxItems">纵坐标最大项目数</label>
-                        <input type="number" id="yMaxItems" min="10" max="500" value="30">
-                    </div>
-
-                    <button class="btn btn-primary" onclick="calculateSimilarity()">计算相似度</button>
-                    <button class="btn btn-secondary" onclick="loadCollections()" style="margin-top: 6px;">刷新Collections</button>
+        <div class="control-group">
+            <label>横坐标 Collection</label>
+            <div id="xCollectionContainer" class="collection-container">
+                <div class="collection-select-row">
+                    <select class="x-collection-select">
+                        <option value="">请选择...</option>
+                    </select>
+                    <button type="button" class="btn-add-collection" onclick="addCollectionSelect('x')" title="添加">+</button>
                 </div>
             </div>
+            <div class="required-error" id="xCollectionError">请选择至少一个横坐标 Collection</div>
+        </div>
+
+        <div class="control-group">
+            <label for="xMaxItems">横坐标最大项目数</label>
+            <input type="number" id="xMaxItems" min="10" max="500" value="30">
+        </div>
+
+        <div class="control-group">
+            <label>纵坐标 Collection</label>
+            <div id="yCollectionContainer" class="collection-container">
+                <div class="collection-select-row">
+                    <select class="y-collection-select">
+                        <option value="">请选择...</option>
+                    </select>
+                    <button type="button" class="btn-add-collection" onclick="addCollectionSelect('y')" title="添加">+</button>
+                </div>
+            </div>
+            <div class="required-error" id="yCollectionError">请选择至少一个纵坐标 Collection</div>
+        </div>
+
+        <div class="control-group">
+            <label for="yMaxItems">纵坐标最大项目数</label>
+            <input type="number" id="yMaxItems" min="10" max="500" value="30">
+        </div>
+
+        <button class="btn btn-primary" onclick="calculateSimilarity()">计算相似度</button>
+        <button class="btn btn-secondary" onclick="loadCollections()" style="margin-top: 6px;">刷新Collections</button>
+    </div>
+</div>
 
             <!-- 可视化控制 -->
             <div class="control-panel">
                 <div class="control-section">
                     <div class="section-title">可视化控制</div>
+                    <div class="control-section" id="matrixSelectorControl" style="display: none;">
+                        <div class="section-title">图表选择</div>
+
+                        <div class="matrix-button-table-container">
+                            <table class="matrix-button-table" id="matrixButtonTable">
+                                <!-- 动态生成的按钮表格 -->
+                            </table>
+                        </div>
+
+                        <div class="matrix-selection-info" id="matrixSelectionInfo" style="display: none;">
+                            <div class="info-text">
+                                <span id="selectedMatrixText">未选择</span>
+                            </div>
+                        </div>
+                    </div>
 
                     <div class="control-group" id="displayFieldControls" style="display: none;">
                         <label for="xDisplayField">横坐标显示字段</label>
@@ -725,6 +917,13 @@
     let xAvailableFields = [];
     let yAvailableFields = [];
     let currentTopkAxis = 'x'; // 'x' 或 'y'
+    let availableCollections = [];
+
+    let allSimilarityResults = [];
+    let currentMatrixIndex = 0; // 当前显示的矩阵索引
+    let selectedMatrixIndices = []; // 存储选中的矩阵索引
+    let differenceMatrices = {}; // 存储差值矩阵的缓存 key格式: "idx1-idx2"
+
 
     const DEFAULT_FIELD_NAMES = ['document', 'text', 'name'];
 
@@ -789,10 +988,8 @@
 
     // 清除所有验证错误状态
     function clearValidationErrors() {
-        const requiredFields = ['xCollection', 'yCollection'];
-        requiredFields.forEach(fieldId => {
-            showFieldValidationError(fieldId, false);
-        });
+        document.getElementById('xCollectionError').style.display = 'none';
+        document.getElementById('yCollectionError').style.display = 'none';
     }
 
     // 获取默认显示字段函数
@@ -836,42 +1033,102 @@
         }
     }
 
-    // 加载Collections列表
-    async function loadCollections() {
-        try {
-            showLoading(true, '正在加载Collections...');
+    // 修改loadCollections函数
+async function loadCollections() {
+    try {
+        showLoading(true, '正在加载Collections...');
 
-            const data = await apiCall('/collections');
-            const collections = data.collections || [];
+        const data = await apiCall('/collections');
+        const collections = data.collections || [];
 
-            const selects = ['xCollection', 'yCollection'];
-            selects.forEach(selectId => {
-                const select = document.getElementById(selectId);
-                select.innerHTML = '<option value="">请选择...</option>';
+        // 更新全局变量
+        availableCollections = collections;
 
-                collections.forEach(collection => {
-                    const option = new Option(collection, collection);
-                    select.add(option);
-                });
-            });
+        // 更新所有现有的选择框
+        updateAllCollectionSelects();
 
-            showSuccess(`成功加载 ${collections.length} 个Collections`);
+        showSuccess(`成功加载 ${collections.length} 个Collections`);
 
-        } catch (error) {
-            showError('加载Collections失败: ' + error.message);
-        } finally {
-            showLoading(false);
-        }
+    } catch (error) {
+        showError('加载Collections失败: ' + error.message);
+    } finally {
+        showLoading(false);
     }
+}
 
-    // 当collection选择变化时，清除验证错误
-    document.getElementById('xCollection').addEventListener('change', function() {
-        showFieldValidationError('xCollection', false);
+// 新增：更新所有collection选择框
+function updateAllCollectionSelects() {
+    // 更新所有X轴选择框
+    const xSelects = document.querySelectorAll('.x-collection-select');
+    xSelects.forEach(select => {
+        updateSingleCollectionSelect(select);
     });
 
-    document.getElementById('yCollection').addEventListener('change', function() {
-        showFieldValidationError('yCollection', false);
+    // 更新所有Y轴选择框
+    const ySelects = document.querySelectorAll('.y-collection-select');
+    ySelects.forEach(select => {
+        updateSingleCollectionSelect(select);
     });
+}
+
+// 新增：更新单个collection选择框
+function updateSingleCollectionSelect(select) {
+    const currentValue = select.value;
+    select.innerHTML = '<option value="">请选择...</option>';
+
+    availableCollections.forEach(collection => {
+        const option = new Option(collection, collection);
+        select.add(option);
+    });
+
+    // 如果之前有选中值且该值仍然存在，保持选中
+    if (currentValue && availableCollections.includes(currentValue)) {
+        select.value = currentValue;
+    }
+}
+
+// 修改addCollectionSelect函数
+function addCollectionSelect(axis) {
+    const containerId = axis === 'x' ? 'xCollectionContainer' : 'yCollectionContainer';
+    const container = document.getElementById(containerId);
+    const selectClass = axis === 'x' ? 'x-collection-select' : 'y-collection-select';
+
+    // 创建新的选择框行
+    const newRow = document.createElement('div');
+    newRow.className = 'collection-select-row';
+
+    // 创建select元素
+    const newSelect = document.createElement('select');
+    newSelect.className = selectClass;
+
+    // 使用全局变量填充options
+    updateSingleCollectionSelect(newSelect);
+
+    // 创建删除按钮
+    const removeBtn = document.createElement('button');
+    removeBtn.type = 'button';
+    removeBtn.className = 'btn-remove-collection';
+    removeBtn.textContent = '-';
+    removeBtn.title = '删除';
+    removeBtn.onclick = function() {
+        removeCollectionSelect(this);
+    };
+
+    newRow.appendChild(newSelect);
+    newRow.appendChild(removeBtn);
+    container.appendChild(newRow);
+
+    // 清除验证错误
+    const errorId = axis === 'x' ? 'xCollectionError' : 'yCollectionError';
+    showFieldValidationError(errorId, false);
+}
+
+// 删除collection选择框
+function removeCollectionSelect(button) {
+    const row = button.closest('.collection-select-row');
+    row.remove();
+}
+
 
     // 生成唯一标签函数，使用零宽字符和不间断空格确保唯一性
     function generateUniqueLabels(data, field) {
@@ -1050,89 +1307,450 @@
     }
 
     // 计算相似度矩阵
-    async function calculateSimilarity() {
-        const xCollection = document.getElementById('xCollection').value;
-        const yCollection = document.getElementById('yCollection').value;
-        const xMaxItems = parseInt(document.getElementById('xMaxItems').value) || 30;
-        const yMaxItems = parseInt(document.getElementById('yMaxItems').value) || 30;
+async function calculateSimilarity() {
+    // 获取所有选中的X轴collections
+    const xSelects = document.querySelectorAll('.x-collection-select');
+    const xCollections = Array.from(xSelects)
+        .map(select => select.value)
+        .filter(value => value !== '');
 
-        // 先清除之前的验证错误
-        clearValidationErrors();
+    // 获取所有选中的Y轴collections
+    const ySelects = document.querySelectorAll('.y-collection-select');
+    const yCollections = Array.from(ySelects)
+        .map(select => select.value)
+        .filter(value => value !== '');
 
-        // 检查必要项是否填写
-        const requiredFields = [
-            { value: xCollection, id: 'xCollection', name: '横坐标 Collection' },
-            { value: yCollection, id: 'yCollection', name: '纵坐标 Collection' }
-        ];
+    const xMaxItems = parseInt(document.getElementById('xMaxItems').value) || 30;
+    const yMaxItems = parseInt(document.getElementById('yMaxItems').value) || 30;
 
-        const missingFields = requiredFields.filter(field => !field.value);
+    // 先清除之前的验证错误
+    clearValidationErrors();
 
-        if (missingFields.length > 0) {
-            // 给未填写的字段添加红色边框
-            missingFields.forEach(field => {
-                showFieldValidationError(field.id, true);
-            });
-
-            const missingNames = missingFields.map(field => field.name).join('、');
-            showError(`请填写以下必要字段：${missingNames}`);
-            return;
-        }
-
-        try {
-            showLoading(true, '正在计算相似度矩阵...');
-
-            const data = await apiCall('/calculate', {
-                method: 'POST',
-                body: JSON.stringify({
-                    x_collection: xCollection,
-                    y_collection: yCollection,
-                    x_max_items: xMaxItems,
-                    y_max_items: yMaxItems
-                })
-            });
-
-            currentResult = data.result;
-            originalMatrix = currentResult.matrix;
-            originalXData = currentResult.x_data;
-            originalYData = currentResult.y_data;
-            xAvailableFields = currentResult.x_available_fields;
-            yAvailableFields = currentResult.y_available_fields;
-
-            // 根据设置的最大项目数进行裁剪
-            currentXData = originalXData.slice(0, xMaxItems);
-            currentYData = originalYData.slice(0, yMaxItems);
-
-            // 裁剪矩阵
-            filteredMatrix = originalMatrix.slice(0, yMaxItems).map(row => row.slice(0, xMaxItems));
-
-            // 更新显示字段控制器
-            updateDisplayFieldControls();
-
-            // 获取默认显示字段（在控件更新后）
-            const defaultXField = getDefaultDisplayField(xAvailableFields);
-            const defaultYField = getDefaultDisplayField(yAvailableFields);
-
-            // 使用默认字段生成初始标签
-            currentXLabels = generateUniqueLabels(currentXData, defaultXField);
-            currentYLabels = generateUniqueLabels(currentYData, defaultYField);
-
-            // 更新Top-K滑块的最大值
-            updateTopkSliderMax();
-
-            // 更新可视化
-            createHeatmap();
-
-            // 显示统计信息
-            showStatistics(currentResult.stats);
-
-            showSuccess('相似度计算完成！');
-
-        } catch (error) {
-            showError('计算相似度失败: ' + error.message);
-        } finally {
-            showLoading(false);
-        }
+    // 检查必要项是否填写
+    if (xCollections.length === 0) {
+        document.getElementById('xCollectionError').style.display = 'block';
+        showError('请至少选择一个横坐标 Collection');
+        return;
     }
+    if (yCollections.length === 0) {
+        document.getElementById('yCollectionError').style.display = 'block';
+        showError('请至少选择一个纵坐标 Collection');
+        return;
+    }
+
+    try {
+        // 清空之前的结果
+        allSimilarityResults = [];
+        currentMatrixIndex = 0;
+
+        // 计算总的请求数
+        const totalRequests = xCollections.length * yCollections.length;
+        let completedRequests = 0;
+
+        showLoading(true, `正在计算相似度矩阵... (0/${totalRequests})`);
+
+        // 遍历所有X和Y的组合
+        for (let i = 0; i < xCollections.length; i++) {
+            for (let j = 0; j < yCollections.length; j++) {
+                const xCollection = xCollections[i];
+                const yCollection = yCollections[j];
+
+                try {
+                    // 更新进度
+                    completedRequests++;
+                    showLoading(true, `正在计算相似度矩阵... (${completedRequests}/${totalRequests})`);
+
+                    const data = await apiCall('/calculate', {
+                        method: 'POST',
+                        body: JSON.stringify({
+                            x_collection: xCollection,
+                            y_collection: yCollection,
+                            x_max_items: xMaxItems,
+                            y_max_items: yMaxItems
+                        })
+                    });
+
+                    // 保存结果
+                    allSimilarityResults.push({
+                        xCollection: xCollection,
+                        yCollection: yCollection,
+                        result: data.result,
+                        matrix: data.result.matrix,
+                        xData: data.result.x_data.slice(0, xMaxItems),
+                        yData: data.result.y_data.slice(0, yMaxItems),
+                        xAvailableFields: data.result.x_available_fields,
+                        yAvailableFields: data.result.y_available_fields,
+                        stats: data.result.stats
+                    });
+
+                } catch (error) {
+                    showWarning(`计算 ${xCollection} vs ${yCollection} 失败: ${error.message}`);
+                }
+            }
+        }
+
+        if (allSimilarityResults.length === 0) {
+            throw new Error('所有相似度计算都失败了');
+        }
+        selectedMatrixIndices = [];
+        differenceMatrices = {};
+
+        // 显示第一个结果
+        currentMatrixIndex = 0;
+        loadMatrixByIndex(0);
+
+        // 更新图表选择器
+        updateMatrixSelector();
+
+        // 自动选中第一个按钮
+        if (allSimilarityResults.length > 0) {
+            selectedMatrixIndices = [0];
+            updateButtonStates();
+            updateSelectionInfo();
+        }
+
+        showSuccess(`成功计算 ${allSimilarityResults.length} 个相似度矩阵!`);
+
+    } catch (error) {
+        showError('计算相似度失败: ' + error.message);
+    } finally {
+        showLoading(false);
+    }
+}
+
+// 根据索引加载矩阵数据
+function loadMatrixByIndex(index) {
+    if (index < 0 || index >= allSimilarityResults.length) {
+        return;
+    }
+
+    currentMatrixIndex = index;
+    const matrixData = allSimilarityResults[index];
+
+    // 更新当前数据
+    currentResult = matrixData.result;
+    originalMatrix = matrixData.matrix;
+    originalXData = matrixData.result.x_data;
+    originalYData = matrixData.result.y_data;
+    xAvailableFields = matrixData.xAvailableFields;
+    yAvailableFields = matrixData.yAvailableFields;
+
+    currentXData = matrixData.xData;
+    currentYData = matrixData.yData;
+
+    // 裁剪矩阵
+    filteredMatrix = originalMatrix.slice(0, currentYData.length)
+        .map(row => row.slice(0, currentXData.length));
+
+    // 更新显示字段控制器
+    updateDisplayFieldControls();
+
+    // 获取默认显示字段
+    const defaultXField = getDefaultDisplayField(xAvailableFields);
+    const defaultYField = getDefaultDisplayField(yAvailableFields);
+
+    // 使用默认字段生成初始标签
+    currentXLabels = generateUniqueLabels(currentXData, defaultXField);
+    currentYLabels = generateUniqueLabels(currentYData, defaultYField);
+
+    // 更新Top-K滑块的最大值
+    updateTopkSliderMax();
+
+    // 更新可视化
+    createHeatmap();
+
+    // 更新相似度滑块范围
+    updateSimilaritySliderRange();
+
+    // 显示统计信息
+    showStatistics(matrixData.stats);
+}
+
+function updateMatrixSelector() {
+    if (allSimilarityResults.length === 0) return;
+
+    // 获取所有唯一的X和Y collections
+    const xCollections = [...new Set(allSimilarityResults.map(r => r.xCollection))];
+    const yCollections = [...new Set(allSimilarityResults.map(r => r.yCollection))];
+
+    // 创建按钮表格
+    const table = document.getElementById('matrixButtonTable');
+    table.innerHTML = '';
+
+    // 创建表头行
+    const headerRow = document.createElement('tr');
+    headerRow.innerHTML = '<th></th>'; // 左上角空单元格
+    xCollections.forEach(xCol => {
+        const th = document.createElement('th');
+        th.textContent = xCol;
+        headerRow.appendChild(th);
+    });
+    table.appendChild(headerRow);
+
+    // 创建数据行
+    yCollections.forEach(yCol => {
+        const row = document.createElement('tr');
+
+        // 第一列：Y collection名称
+        const labelCell = document.createElement('td');
+        labelCell.textContent = yCol;
+        row.appendChild(labelCell);
+
+        // 其他列：按钮
+        xCollections.forEach(xCol => {
+            const cell = document.createElement('td');
+
+            // 查找对应的矩阵索引
+            const matrixIndex = allSimilarityResults.findIndex(
+                r => r.xCollection === xCol && r.yCollection === yCol
+            );
+
+            if (matrixIndex >= 0) {
+                const btn = document.createElement('button');
+                btn.className = 'matrix-selection-btn';
+                btn.textContent = '显示';
+                btn.dataset.index = matrixIndex;
+                btn.onclick = function() {
+                    handleMatrixButtonClick(matrixIndex);
+                };
+                cell.appendChild(btn);
+            } else {
+                cell.textContent = '-';
+            }
+
+            row.appendChild(cell);
+        });
+
+        table.appendChild(row);
+    });
+
+    // 显示控制区域
+    document.getElementById('matrixSelectorControl').style.display = 'block';
+}
+
+// 新增：处理矩阵按钮点击
+function handleMatrixButtonClick(clickedIndex) {
+    const buttons = document.querySelectorAll('.matrix-selection-btn');
+
+    // 情况1: 未选中任何矩阵
+    if (selectedMatrixIndices.length === 0) {
+        selectedMatrixIndices = [clickedIndex];
+        updateButtonStates();
+        loadMatrixByIndex(clickedIndex);
+        updateSelectionInfo();
+        return;
+    }
+
+    // 情况2: 点击的是已选中的按钮
+    if (selectedMatrixIndices.includes(clickedIndex)) {
+        selectedMatrixIndices = selectedMatrixIndices.filter(idx => idx !== clickedIndex);
+
+        if (selectedMatrixIndices.length === 0) {
+            // 全部取消选择
+            updateButtonStates();
+            updateSelectionInfo();
+        } else {
+            // 还有其他选中的按钮，显示剩余的
+            updateButtonStates();
+            loadMatrixByIndex(selectedMatrixIndices[0]);
+            updateSelectionInfo();
+        }
+        return;
+    }
+
+    // 情况3: 已有一个选中，点击另一个
+    if (selectedMatrixIndices.length === 1) {
+        const firstIndex = selectedMatrixIndices[0];
+        const firstMatrix = allSimilarityResults[firstIndex];
+        const clickedMatrix = allSimilarityResults[clickedIndex];
+
+        // 检查矩阵大小是否相同
+        const sameSize = (
+            firstMatrix.matrix.length === clickedMatrix.matrix.length &&
+            firstMatrix.matrix[0].length === clickedMatrix.matrix[0].length
+        );
+
+        if (sameSize) {
+            // 大小相同：显示差值
+            selectedMatrixIndices = [firstIndex, clickedIndex];
+            updateButtonStates();
+            loadDifferenceMatrix(firstIndex, clickedIndex);
+            updateSelectionInfo();
+        } else {
+            // 大小不同：替换选择
+            selectedMatrixIndices = [clickedIndex];
+            updateButtonStates();
+            loadMatrixByIndex(clickedIndex);
+            updateSelectionInfo();
+        }
+        return;
+    }
+
+    // 情况4: 已有两个选中（差值状态），点击新的
+    if (selectedMatrixIndices.length === 2) {
+        selectedMatrixIndices = [clickedIndex];
+        updateButtonStates();
+        loadMatrixByIndex(clickedIndex);
+        updateSelectionInfo();
+        return;
+    }
+}
+
+// 新增：更新按钮状态
+function updateButtonStates() {
+    const buttons = document.querySelectorAll('.matrix-selection-btn');
+
+    buttons.forEach(btn => {
+        const index = parseInt(btn.dataset.index);
+        btn.classList.remove('selected', 'selected-secondary', 'difference');
+
+        if (selectedMatrixIndices.length === 1 && selectedMatrixIndices[0] === index) {
+            btn.classList.add('selected');
+            btn.textContent = '已选';
+        } else if (selectedMatrixIndices.length === 2) {
+            if (selectedMatrixIndices[0] === index) {
+                btn.classList.add('selected');
+                btn.textContent = '被减';
+            } else if (selectedMatrixIndices[1] === index) {
+                btn.classList.add('selected-secondary');
+                btn.textContent = '减数';
+            }
+        } else {
+            btn.textContent = '显示';
+        }
+    });
+}
+
+// 新增：更新选择信息显示
+function updateSelectionInfo() {
+    const infoDiv = document.getElementById('matrixSelectionInfo');
+    const textSpan = document.getElementById('selectedMatrixText');
+
+    if (selectedMatrixIndices.length === 0) {
+        infoDiv.style.display = 'none';
+        return;
+    }
+
+    infoDiv.style.display = 'block';
+
+    if (selectedMatrixIndices.length === 1) {
+        const matrix = allSimilarityResults[selectedMatrixIndices[0]];
+        textSpan.textContent = `当前显示: ${matrix.xCollection} vs ${matrix.yCollection}`;
+    } else if (selectedMatrixIndices.length === 2) {
+        const matrix1 = allSimilarityResults[selectedMatrixIndices[0]];
+        const matrix2 = allSimilarityResults[selectedMatrixIndices[1]];
+        textSpan.innerHTML = `差值模式: <br>(${matrix1.xCollection} vs ${matrix1.yCollection}) - (${matrix2.xCollection} vs ${matrix2.yCollection})`;
+    }
+}
+
+// 加载差值矩阵
+function loadDifferenceMatrix(index1, index2) {
+    const cacheKey = `${index1}-${index2}`;
+
+    // 检查缓存
+    if (!differenceMatrices[cacheKey]) {
+        // 计算差值矩阵
+        const matrix1 = allSimilarityResults[index1].matrix;
+        const matrix2 = allSimilarityResults[index2].matrix;
+
+        const diffMatrix = matrix1.map((row, i) =>
+            row.map((val, j) => val - matrix2[i][j])
+        );
+
+        differenceMatrices[cacheKey] = diffMatrix;
+        // 同时缓存反向差值
+        differenceMatrices[`${index2}-${index1}`] = diffMatrix.map(row =>
+            row.map(val => -val)
+        );
+    }
+
+    // 使用第一个矩阵的数据和字段信息
+    const matrixData = allSimilarityResults[index1];
+    currentResult = matrixData.result;
+    originalMatrix = differenceMatrices[cacheKey];
+    originalXData = matrixData.result.x_data;
+    originalYData = matrixData.result.y_data;
+    xAvailableFields = matrixData.xAvailableFields;
+    yAvailableFields = matrixData.yAvailableFields;
+
+    currentXData = matrixData.xData;
+    currentYData = matrixData.yData;
+
+    filteredMatrix = originalMatrix.slice(0, currentYData.length)
+        .map(row => row.slice(0, currentXData.length));
+
+    updateDisplayFieldControls();
+
+    const defaultXField = getDefaultDisplayField(xAvailableFields);
+    const defaultYField = getDefaultDisplayField(yAvailableFields);
+
+    currentXLabels = generateUniqueLabels(currentXData, defaultXField);
+    currentYLabels = generateUniqueLabels(currentYData, defaultYField);
+
+    updateTopkSliderMax();
+    createHeatmap();
+
+    // 更新相似度滑块范围
+    updateSimilaritySliderRange();
+
+    // 显示差值矩阵的统计信息
+    showDifferenceStatistics(originalMatrix);
+}
+
+// 新增：显示差值统计信息
+function showDifferenceStatistics(diffMatrix) {
+    const statsSection = document.getElementById('statsSection');
+    const statsGrid = document.getElementById('statsGrid');
+
+    // 计算差值矩阵的统计信息
+    let flatValues = [];
+    diffMatrix.forEach(row => {
+        row.forEach(val => {
+            if (val !== null && val !== undefined) {
+                flatValues.push(val);
+            }
+        });
+    });
+
+    const totalPairs = flatValues.length;
+    const avgDiff = flatValues.reduce((a, b) => a + b, 0) / totalPairs;
+    const maxDiff = Math.max(...flatValues);
+    const minDiff = Math.min(...flatValues);
+
+    const currentDisplayCount = getCurrentDisplayCount();
+
+    statsGrid.innerHTML = `
+        <div class="stat-item">
+            <div class="value">${totalPairs}</div>
+            <div class="label">总对比数</div>
+        </div>
+        <div class="stat-item">
+            <div class="value" id="currentDisplayCount">${currentDisplayCount}</div>
+            <div class="label">当前显示对比数</div>
+        </div>
+        <div class="stat-item">
+            <div class="value">${avgDiff.toFixed(3)}</div>
+            <div class="label">平均差值</div>
+        </div>
+        <div class="stat-item">
+            <div class="value">${maxDiff.toFixed(3)}</div>
+            <div class="label">最大差值</div>
+        </div>
+        <div class="stat-item">
+            <div class="value">${minDiff.toFixed(3)}</div>
+            <div class="label">最小差值</div>
+        </div>
+        <div class="stat-item">
+            <div class="value">差值模式</div>
+            <div class="label">当前模式</div>
+        </div>
+    `;
+
+    statsSection.style.display = 'block';
+    operationsSection.style.display = 'block';
+}
+
+
 
     // 更新Top-K滑块的最大值
     function updateTopkSliderMax() {
@@ -1269,6 +1887,9 @@
 
     // 更新热力图数据但保持缩放状态
     function updateHeatmapData(matrix, xLabels, yLabels, preserveLayout = null) {
+        // 获取当前模式的相似度范围
+        const range = getCurrentSimilarityRange();
+
         const trace = {
             z: matrix,
             x: xLabels,
@@ -1281,13 +1902,15 @@
                           '<b>相似度: %{z:.4f}</b>' +
                           '<extra></extra>',
             colorbar: {
-                title: '相似度',
+                title: isDifferenceMode() ? '差值' : '相似度',
                 titleside: 'right',
                 tickmode: 'linear',
-                tick0: 0,
-                dtick: 0.1
+                tick0: range.min,
+                dtick: isDifferenceMode() ? 0.2 : 0.1
             },
-            showscale: true
+            showscale: true,
+            zmin: range.min,  // 固定最小值
+            zmax: range.max   // 固定最大值
         };
 
         // 如果有保存的布局状态，则应用它
@@ -1299,7 +1922,9 @@
                 z: [matrix],
                 x: [xLabels],
                 y: [yLabels],
-                colorscale: [colorSchemes[currentColorScheme]]
+                colorscale: [colorSchemes[currentColorScheme]],
+                zmin: [range.min],  // 添加这行
+                zmax: [range.max]   // 添加这行
             });
 
             // 如果需要恢复特定的缩放范围，使用 relayout
@@ -1325,6 +1950,108 @@
             createHeatmap(matrix, xLabels, yLabels);
         }
     }
+
+    function initRangeSlider() {
+    const minSlider = document.getElementById('minSimilaritySlider');
+    const maxSlider = document.getElementById('maxSimilaritySlider');
+    const minInput = document.getElementById('minSimilarityInput');
+    const maxInput = document.getElementById('maxSimilarityInput');
+    const minValue = document.getElementById('minSimilarityValue');
+    const maxValue = document.getElementById('maxSimilarityValue');
+    const track = document.getElementById('similarityTrack');
+
+    function updateTrack() {
+        const min = parseFloat(minSlider.value);
+        const max = parseFloat(maxSlider.value);
+        const range = getCurrentSimilarityRange();
+
+        // 计算百分比位置（考虑负值情况）
+        const percent1 = ((min - range.min) / (range.max - range.min)) * 100;
+        const percent2 = ((max - range.min) / (range.max - range.min)) * 100;
+
+        track.style.left = percent1 + '%';
+        track.style.width = (percent2 - percent1) + '%';
+
+        minValue.textContent = min.toFixed(2);
+        maxValue.textContent = max.toFixed(2);
+        minInput.value = min;
+        maxInput.value = max;
+
+        // 实时更新热力图
+        if (filteredMatrix) {
+            updateHeatmap();
+        }
+    }
+
+    minSlider.addEventListener('input', function() {
+        if (parseFloat(this.value) > parseFloat(maxSlider.value)) {
+            this.value = maxSlider.value;
+        }
+        updateTrack();
+    });
+
+    maxSlider.addEventListener('input', function() {
+        if (parseFloat(this.value) < parseFloat(minSlider.value)) {
+            this.value = minSlider.value;
+        }
+        updateTrack();
+    });
+
+    minInput.addEventListener('change', function() {
+        const range = getCurrentSimilarityRange();
+        const val = Math.max(range.min, Math.min(range.max, parseFloat(this.value) || range.min));
+        minSlider.value = val;
+        updateTrack();
+    });
+
+    maxInput.addEventListener('change', function() {
+        const range = getCurrentSimilarityRange();
+        const val = Math.max(range.min, Math.min(range.max, parseFloat(this.value) || range.max));
+        maxSlider.value = val;
+        updateTrack();
+    });
+
+    updateTrack();
+}
+
+// 更新相似度滑块的范围
+function updateSimilaritySliderRange() {
+    const range = getCurrentSimilarityRange();
+    const minSlider = document.getElementById('minSimilaritySlider');
+    const maxSlider = document.getElementById('maxSimilaritySlider');
+    const minInput = document.getElementById('minSimilarityInput');
+    const maxInput = document.getElementById('maxSimilarityInput');
+
+    // 更新滑块范围
+    minSlider.min = range.min;
+    minSlider.max = range.max;
+    minSlider.step = isDifferenceMode() ? 0.01 : 0.01;
+    minSlider.value = range.min;
+
+    maxSlider.min = range.min;
+    maxSlider.max = range.max;
+    maxSlider.step = isDifferenceMode() ? 0.01 : 0.01;
+    maxSlider.value = range.max;
+
+    // 更新输入框范围
+    minInput.min = range.min;
+    minInput.max = range.max;
+    minInput.value = range.min;
+
+    maxInput.min = range.min;
+    maxInput.max = range.max;
+    maxInput.value = range.max;
+
+    // 更新显示
+    document.getElementById('minSimilarityValue').textContent = range.min.toFixed(2);
+    document.getElementById('maxSimilarityValue').textContent = range.max.toFixed(2);
+
+    // 更新track位置
+    const track = document.getElementById('similarityTrack');
+    track.style.left = '0%';
+    track.style.width = '100%';
+}
+
 
     // 更新当前显示对比数统计
     function updateCurrentDisplayStat() {
@@ -1418,6 +2145,16 @@
 
         return { matrix, xLabels, yLabels };
     }
+    // 判断当前是否为差值模式
+    function isDifferenceMode() {
+        return selectedMatrixIndices.length === 2;
+    }
+
+    // 获取当前模式下的相似度范围
+    function getCurrentSimilarityRange() {
+        return isDifferenceMode() ? { min: -1, max: 1 } : { min: 0, max: 1 };
+    }
+
 
     // 创建热力图
     function createHeatmap(matrix = filteredMatrix, xLabels = currentXLabels, yLabels = currentYLabels) {
@@ -1425,6 +2162,9 @@
             showError('没有相似度数据');
             return;
         }
+
+        // 获取当前模式的相似度范围
+        const range = getCurrentSimilarityRange();
 
         const trace = {
             z: matrix,
@@ -1438,13 +2178,15 @@
                           '<b>相似度: %{z:.4f}</b>' +
                           '<extra></extra>',
             colorbar: {
-                title: '相似度',
+                title: isDifferenceMode() ? '差值' : '相似度',
                 titleside: 'right',
                 tickmode: 'linear',
-                tick0: 0,
-                dtick: 0.1
+                tick0: range.min,
+                dtick: isDifferenceMode() ? 0.2 : 0.1
             },
-            showscale: true
+            showscale: true,
+            zmin: range.min,  // 固定最小值
+            zmax: range.max   // 固定最大值
         };
 
         // 获取容器实际尺寸
@@ -1457,8 +2199,10 @@
         const availableHeight = containerRect.height - controlsHeight - 24; // 减去controls高度和padding
 
         // 动态生成坐标轴标题
-        const xCollectionName = document.getElementById('xCollection').value;
-        const yCollectionName = document.getElementById('yCollection').value;
+        const matrixData = allSimilarityResults[currentMatrixIndex];
+        const xCollectionName = matrixData ? matrixData.xCollection : '';
+        const yCollectionName = matrixData ? matrixData.yCollection : '';
+
         const xDisplayField = document.getElementById('xDisplayField').value;
         const yDisplayField = document.getElementById('yDisplayField').value;
 
@@ -1746,12 +2490,6 @@
                 }
                 break;
 
-            case 'ocean':
-                // Ocean颜色映射
-                r = Math.round(0 + (102 - 0) * normalizedValue);
-                g = Math.round(51 + (204 - 51) * normalizedValue);
-                b = Math.round(102 + (255 - 102) * normalizedValue);
-                break;
 
             default:
                 // 默认灰度映射
@@ -2003,6 +2741,18 @@
         initColorSchemeSelector();
         initSortSelector();
         loadCollections(); // 自动加载Collections
+        // 为 collection 选择框添加事件委托
+        document.getElementById('xCollectionContainer').addEventListener('change', function(e) {
+            if (e.target.classList.contains('x-collection-select')) {
+                document.getElementById('xCollectionError').style.display = 'none';
+            }
+        });
+
+        document.getElementById('yCollectionContainer').addEventListener('change', function(e) {
+            if (e.target.classList.contains('y-collection-select')) {
+                document.getElementById('yCollectionError').style.display = 'none';
+            }
+        });
     });
 </script>
 
