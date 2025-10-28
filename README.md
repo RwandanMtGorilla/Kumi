@@ -70,7 +70,7 @@ uv run embedding-api-qwen3_ST.py
 
 ## 讨论群
 
-![wechat_image_10-13.jpg](images/wechat_image_10-13.jpg)
+![讨论群二维码](images/wechat_image_11-4.jpg)
 
 ## 代码结构
 ```md
