@@ -423,6 +423,72 @@ box-shadow: 0 1px 2px rgba(0,0,0,0.05);
     100% { transform: rotate(360deg); }
 }
 
+/* 右上角临时消息动画 */
+@keyframes slideIn {
+    from {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+@keyframes slideOut {
+    from {
+        transform: translateX(0);
+        opacity: 1;
+    }
+    to {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+}
+
+/* 右上角临时消息样式 */
+.temp-message {
+    position: fixed;
+    top: 80px;
+    right: 20px;
+    z-index: 10000;
+    min-width: 250px;
+    max-width: 400px;
+    padding: 12px 16px;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 500;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    backdrop-filter: blur(8px);
+    animation: slideIn 0.3s ease;
+}
+
+/* 不同类型的临时消息颜色 */
+.temp-message.error {
+    background: #fee2e2;
+    border: 1px solid #ef4444;
+    color: #991b1b;
+}
+
+.temp-message.success {
+    background: linear-gradient(135deg, rgba(170, 169, 255, 0.2), rgba(181, 213, 255, 0.2));
+    border: 1px solid #AAA9FF;
+    color: #404040;
+}
+
+.temp-message.warning {
+    background: #fef3c7;
+    border: 1px solid #f59e0b;
+    color: #92400e;
+}
+
+.temp-message.info {
+    background: #cff4fc;
+    border: 1px solid #0dcaf0;
+    color: #055160;
+}
+
+/* 旧的message样式(保留以防某处还在使用) */
 .message {
     padding: 10px;
     border-radius: 4px;
@@ -733,8 +799,24 @@ line-height: 1.4;
 .matrix-list-item {
     background: white;
     border-bottom: 1px solid #e9ecef;
-    padding: 12px;
+    border-left: 3px solid #dee2e6; /* 默认边框颜色 */
+    padding: 6px 12px; /* 上下6px 左右12px */
     transition: all 0.2s ease;
+}
+
+.matrix-item-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+}
+
+.matrix-item-left {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex: 1;
+    min-width: 0; /* 允许flex子元素缩小 */
 }
 
 .matrix-list-item:last-child {
@@ -745,12 +827,76 @@ line-height: 1.4;
     background: #f8f9fa;
 }
 
+/* 边框颜色状态 */
+.matrix-list-item.border-primary {
+    border-left-color: #28a745 !important; /* 绿色 - 主数据源/被减数 */
+}
+
+.matrix-list-item.border-subtract {
+    border-left-color: #dc3545; /* 红色 - 减数 */
+}
+
+.matrix-list-item.border-exclusive {
+    border-left-color: #6666FF; /* 紫色 - 独占模式 */
+}
+
+/* 状态图标(在名称左侧) */
+.matrix-item-badge {
+    width: 20px;
+    height: 20px;
+    min-width: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 17px; /* 14px * 1.2 ≈ 17px */
+    flex-shrink: 0;
+}
+
+.matrix-item-badge.badge-none {
+    color: #9ca3af; /* 灰色 - 无状态 */
+}
+
+.matrix-item-badge.badge-circle {
+    color: #28a745; /* 绿色 - 主数据源 */
+}
+
+.matrix-item-badge.badge-plus {
+    color: #28a745; /* 绿色 - 被减数 */
+}
+
+.matrix-item-badge.badge-minus {
+    color: #dc3545; /* 红色 - 减数 */
+}
+
+.matrix-item-badge.badge-crosshair {
+    color: #6666FF; /* 紫色 - 独占模式 */
+}
+
 .matrix-item-title {
-    font-size: 13px;
+    font-size: 12px;
     font-weight: 600;
     color: #212529;
-    margin-bottom: 8px;
+    margin-bottom: 0px; /* 移除底部margin,从8px改为0px */
     cursor: default;
+    display: flex;
+    flex-direction: column;
+    gap: 0px; /* 减少行间距,从2px改为0px */
+    max-width: 180px; /* 为右侧按钮留出空间 */
+}
+
+.matrix-item-title .collection-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 100%;
+    text-align: center;
+}
+
+.matrix-item-title .vs-text {
+    font-size: 10px;
+    color: #6c757d;
+    font-weight: 400;
+    text-align: center;
 }
 
 .matrix-item-status {
@@ -783,71 +929,64 @@ line-height: 1.4;
 
 .matrix-item-buttons {
     display: flex;
-    gap: 6px;
-    flex-wrap: wrap;
+    gap: 4px; /* 按钮之间使用较小的间距 */
+    flex-shrink: 0;
+    align-items: center;
 }
 
 .matrix-control-btn {
-    flex: 1;
-    min-width: 90px;
-    padding: 6px 10px;
-    font-size: 11px;
-    border: 1px solid #dee2e6;
+    width: 28px;
+    height: 28px;
+    min-width: 28px;
+    padding: 0;
+    font-size: 19px; /* 16px * 1.2 ≈ 19px */
+    border: none;
     border-radius: 4px;
-    background: white;
-    color: #495057;
+    background: transparent;
+    color: #404040; /* 深灰色 - 未激活状态 */
     cursor: pointer;
     transition: all 0.2s ease;
-    font-weight: 500;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .matrix-control-btn:hover {
-    border-color: #0d6efd;
-    color: #0d6efd;
-    transform: translateY(-1px);
-    box-shadow: 0 2px 4px rgba(13, 110, 253, 0.1);
+    background: #f3f4f6;
+    transform: scale(1.1);
 }
 
-.matrix-control-btn.active {
-    background: #0d6efd;
-    border-color: #0d6efd;
-    color: white;
-    font-weight: 600;
-}
-
+/* 应用数据按钮 - 眼睛图标 */
 .matrix-control-btn.btn-apply-data.active {
-    background: #198754;
-    border-color: #198754;
+    color: #28a745; /* 绿色 */
 }
 
+/* 应用筛选器按钮 - 筛选图标 */
 .matrix-control-btn.btn-apply-filter.active {
-    background: #0dcaf0;
-    border-color: #0dcaf0;
-    color: #000;
+    color: #3b82f6; /* 蓝色 */
 }
 
+/* 独占模式按钮 - 准星图标 */
 .matrix-control-btn.btn-exclusive.active {
-    background: #ffc107;
-    border-color: #ffc107;
-    color: #000;
+    color: #6666FF; /* 紫色 */
     animation: pulse 2s infinite;
 }
 
 @keyframes pulse {
     0%, 100% {
-        box-shadow: 0 0 0 0 rgba(255, 193, 7, 0.7);
+        box-shadow: 0 0 0 0 rgba(96, 96, 255, 0.4);
     }
     50% {
-        box-shadow: 0 0 0 6px rgba(255, 193, 7, 0);
+        box-shadow: 0 0 0 4px rgba(96, 96, 255, 0);
     }
 }
 
 .matrix-control-btn:active {
-    transform: translateY(0);
+    transform: scale(0.95);
 }
 
 .matrix-control-btn:disabled {
-    opacity: 0.5;
+    opacity: 0.3;
     cursor: not-allowed;
 }
 

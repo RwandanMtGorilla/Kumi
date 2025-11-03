@@ -5,27 +5,22 @@
 // ============================================================================
 
 // --- 原始数据相关 ---
-let originalMatrix = null;
 let filteredMatrix = null;
-let originalXData = [];
-let originalYData = [];
 let currentXData = [];
 let currentYData = [];
 let currentXLabels = [];
 let currentYLabels = [];
-let currentResult = null;
 let xAvailableFields = [];
 let yAvailableFields = [];
 let availableCollections = [];
 
 // --- 多图管理相关 ---
 let allSimilarityResults = []; // 存储所有相似度矩阵结果，每个元素包含 visualConfig
-let currentMatrixIndex = 0; // 当前显示的矩阵索引（已废弃，保留兼容）
-let selectedMatrixIndices = []; // 存储选中的矩阵索引（已废弃，保留兼容）
-let differenceMatrices = {}; // 存储差值矩阵的缓存 key格式: "idx1-idx2"
 
 // --- 全局默认配色（非可视化控制值的一部分，是全局UI设置） ---
 let currentColorScheme = 'viridis';
+let differenceMatrices = {}; // 存储差值矩阵的缓存 key格式: "idx1-idx2"
+let currentMatrixIndex = 0; // 当前显示的矩阵索引
 
 // ============================================================================
 // 新架构：全局UI状态管理（与图表配置完全分离）
@@ -138,85 +133,6 @@ function createDefaultVisualConfig(xAvailableFields, yAvailableFields) {
     };
 }
 
-/**
- * 从当前UI控件获取可视化配置
- */
-function getCurrentVisualConfigFromUI() {
-    return {
-        displayFields: {
-            xField: document.getElementById('xDisplayField').value,
-            yField: document.getElementById('yDisplayField').value
-        },
-        similarityRange: {
-            min: parseFloat(document.getElementById('minSimilaritySlider').value),
-            max: parseFloat(document.getElementById('maxSimilaritySlider').value)
-        },
-        filters: {
-            topK: {
-                value: parseInt(document.getElementById('topkSlider').value),
-                axis: currentTopkAxis
-            }
-        },
-        sorting: {
-            order: document.getElementById('sortOrder').value
-        }
-    };
-}
-
-/**
- * 将可视化配置应用到UI控件
- */
-function applyVisualConfigToUI(visualConfig) {
-    console.log('[应用配置到UI]', {
-        displayFields: visualConfig.displayFields,
-        similarityRange: visualConfig.similarityRange,
-        topK: visualConfig.filters.topK,
-        sorting: visualConfig.sorting
-    });
-
-    // 1. 更新显示字段
-    document.getElementById('xDisplayField').value = visualConfig.displayFields.xField;
-    document.getElementById('yDisplayField').value = visualConfig.displayFields.yField;
-
-    // 2. 更新相似度范围滑块
-    const minSlider = document.getElementById('minSimilaritySlider');
-    const maxSlider = document.getElementById('maxSimilaritySlider');
-    const minInput = document.getElementById('minSimilarityInput');
-    const maxInput = document.getElementById('maxSimilarityInput');
-
-    minSlider.value = visualConfig.similarityRange.min;
-    maxSlider.value = visualConfig.similarityRange.max;
-    minInput.value = visualConfig.similarityRange.min;
-    maxInput.value = visualConfig.similarityRange.max;
-
-    console.log('[应用配置] 设置滑块值:', minSlider.value, '-', maxSlider.value);
-
-    document.getElementById('minSimilarityValue').textContent = visualConfig.similarityRange.min.toFixed(2);
-    document.getElementById('maxSimilarityValue').textContent = visualConfig.similarityRange.max.toFixed(2);
-
-    // 更新滑块轨道
-    const track = document.getElementById('similarityTrack');
-    const percent1 = (visualConfig.similarityRange.min - parseFloat(minSlider.min)) /
-                     (parseFloat(minSlider.max) - parseFloat(minSlider.min)) * 100;
-    const percent2 = (visualConfig.similarityRange.max - parseFloat(maxSlider.min)) /
-                     (parseFloat(maxSlider.max) - parseFloat(maxSlider.min)) * 100;
-    track.style.left = percent1 + '%';
-    track.style.width = (percent2 - percent1) + '%';
-
-    // 3. 更新Top-K筛选器
-    document.getElementById('topkSlider').value = visualConfig.filters.topK.value;
-    currentTopkAxis = visualConfig.filters.topK.axis;
-
-    // 更新Top-K显示
-    updateTopkDisplay();
-
-    // 更新轴选择按钮状态
-    document.getElementById('xAxisBtn').classList.toggle('active', currentTopkAxis === 'x');
-    document.getElementById('yAxisBtn').classList.toggle('active', currentTopkAxis === 'y');
-
-    // 4. 更新排序
-    document.getElementById('sortOrder').value = visualConfig.sorting.order;
-}
 
 // ============================================================================
 // 常量配置
@@ -237,30 +153,59 @@ const colorSchemes = {
 // ============================================================================
 
 // 消息显示函数
-function showMessage(type, message, duration = 5000) {
-    const messageId = type + 'Message';
-    const messageDiv = document.getElementById(messageId);
-    messageDiv.textContent = message;
-    messageDiv.style.display = 'block';
-
-    // 隐藏其他类型的消息
-    ['error', 'success', 'warning', 'info'].forEach(t => {
-        if (t !== type) {
-            document.getElementById(t + 'Message').style.display = 'none';
-        }
-    });
-
-    if (duration > 0) {
-        setTimeout(() => {
-            messageDiv.style.display = 'none';
-        }, duration);
+/**
+ * 显示右上角临时消息
+ * @param {string} type - 消息类型: 'error', 'success', 'warning', 'info'
+ * @param {string} message - 消息内容
+ * @param {number} duration - 显示时长(毫秒),默认根据类型自动设置
+ */
+function showMessage(type, message, duration = 0) {
+    // 根据类型设置默认显示时长
+    if (duration === 0) {
+        const defaultDurations = {
+            'error': 5000,
+            'success': 3000,
+            'warning': 4000,
+            'info': 3000
+        };
+        duration = defaultDurations[type] || 3000;
     }
+
+    // 创建消息元素
+    const messageEl = document.createElement('div');
+    messageEl.className = `temp-message ${type}`;
+    messageEl.textContent = message;
+
+    // 添加到页面
+    document.body.appendChild(messageEl);
+
+    // 自动移除
+    setTimeout(() => {
+        messageEl.style.animation = 'slideOut 0.3s ease';
+        setTimeout(() => {
+            if (document.body.contains(messageEl)) {
+                document.body.removeChild(messageEl);
+            }
+        }, 300);
+    }, duration);
 }
 
 function showError(message, duration = 5000) { showMessage('error', message, duration); }
 function showSuccess(message, duration = 3000) { showMessage('success', message, duration); }
 function showWarning(message, duration = 4000) { showMessage('warning', message, duration); }
 function showInfo(message, duration = 3000) { showMessage('info', message, duration); }
+
+/**
+ * 截断collection名称
+ * @param {string} name - collection名称
+ * @param {number} maxLength - 最大长度
+ * @returns {string} 截断后的名称
+ */
+function truncateCollectionName(name, maxLength = 20) {
+    if (!name) return '';
+    if (name.length <= maxLength) return name;
+    return name.substring(0, maxLength - 3) + '...';
+}
 
 // 显示加载状态
 function showLoading(show = true, text = '正在加载...') {
@@ -274,11 +219,11 @@ function showFieldValidationError(fieldId, show = true) {
     const errorDiv = document.getElementById(fieldId + 'Error');
 
     if (show) {
-        field.classList.add('required-empty');
-        errorDiv.style.display = 'block';
+        if (field) field.classList.add('required-empty');
+        if (errorDiv) errorDiv.style.display = 'block';
     } else {
-        field.classList.remove('required-empty');
-        errorDiv.style.display = 'none';
+        if (field) field.classList.remove('required-empty');
+        if (errorDiv) errorDiv.style.display = 'none';
     }
 }
 
@@ -418,8 +363,8 @@ function addCollectionSelect(axis) {
     container.appendChild(newRow);
 
     // 清除验证错误
-    const errorId = axis === 'x' ? 'xCollectionError' : 'yCollectionError';
-    showFieldValidationError(errorId, false);
+    const fieldId = axis === 'x' ? 'xCollection' : 'yCollection';
+    showFieldValidationError(fieldId, false);
 }
 
 // 删除collection选择框
@@ -568,6 +513,88 @@ function applyMask(originalMatrix, mask) {
 }
 
 /**
+ * 获取矩阵的尺寸信息
+ * @param {number} index - 图表索引
+ * @returns {Object|null} - 返回 {rows, cols} 或 null
+ */
+function getMatrixSize(index) {
+    if (index < 0 || index >= allSimilarityResults.length) {
+        return null;
+    }
+    const matrix = allSimilarityResults[index].matrix;
+    return {
+        rows: matrix.length,
+        cols: matrix.length > 0 ? matrix[0].length : 0
+    };
+}
+
+/**
+ * 检查指定图表的矩阵大小是否与当前已启用的图表一致
+ * @param {number} newIndex - 要检查的图表索引
+ * @param {string} buttonType - 按钮类型: 'applyData' 或 'applyFilter'
+ * @returns {Object} - {isValid: boolean, message: string, conflictIndices: Array}
+ */
+function checkMatrixSizeConsistency(newIndex, buttonType) {
+    const newSize = getMatrixSize(newIndex);
+    if (!newSize) {
+        return { isValid: false, message: '无效的图表索引', conflictIndices: [] };
+    }
+
+    let activeIndices = [];
+
+    // 根据按钮类型确定需要检查的已启用图表
+    if (buttonType === 'applyData') {
+        // 检查"应用数据"按钮：需要与已启用的应用数据按钮一致
+        if (globalUIState.dataSource.primaryIndex !== null) {
+            activeIndices.push(globalUIState.dataSource.primaryIndex);
+        }
+        if (globalUIState.dataSource.subtractIndex !== null) {
+            activeIndices.push(globalUIState.dataSource.subtractIndex);
+        }
+    } else if (buttonType === 'applyFilter') {
+        // 检查"应用筛选器"按钮：需要与当前数据源一致（如果有数据源）
+        // 同时也需要与其他已启用的筛选器一致
+        if (globalUIState.dataSource.primaryIndex !== null) {
+            activeIndices.push(globalUIState.dataSource.primaryIndex);
+        }
+        if (globalUIState.dataSource.subtractIndex !== null) {
+            activeIndices.push(globalUIState.dataSource.subtractIndex);
+        }
+        // 添加其他已启用的筛选器
+        globalUIState.filters.activeFilterIndices.forEach(idx => {
+            if (!activeIndices.includes(idx)) {
+                activeIndices.push(idx);
+            }
+        });
+    }
+
+    // 如果没有已启用的图表，直接允许
+    if (activeIndices.length === 0) {
+        return { isValid: true, message: '', conflictIndices: [] };
+    }
+
+    // 检查是否与所有已启用的图表尺寸一致
+    const conflictIndices = [];
+    for (const activeIdx of activeIndices) {
+        const activeSize = getMatrixSize(activeIdx);
+        if (activeSize && (activeSize.rows !== newSize.rows || activeSize.cols !== newSize.cols)) {
+            conflictIndices.push(activeIdx);
+        }
+    }
+
+    if (conflictIndices.length > 0) {
+        const conflictList = conflictIndices.map(idx => `图表${idx + 1}`).join('、');
+        return {
+            isValid: false,
+            message: `矩阵大小不一致 (当前图: ${newSize.rows}×${newSize.cols}，已启用的${conflictList}有不同尺寸)，请先松开原按钮`,
+            conflictIndices: conflictIndices
+        };
+    }
+
+    return { isValid: true, message: '', conflictIndices: [] };
+}
+
+/**
  * 计算单张图的最终遮罩（阈值 AND Top-K）
  * @param {number} index - 图表索引
  * @returns {Array<Array<boolean>>|null} - 最终布尔遮罩
@@ -646,91 +673,6 @@ function generateUniqueLabels(data, field) {
     });
 }
 
-// 更新显示字段选择器
-function updateDisplayFieldControls() {
-    if (!currentResult) return;
-
-    // 显示字段控制区域
-    document.getElementById('displayFieldControls').style.display = 'block';
-    document.getElementById('yDisplayFieldControls').style.display = 'block';
-
-    // 获取默认显示字段
-    const defaultXField = getDefaultDisplayField(xAvailableFields);
-    const defaultYField = getDefaultDisplayField(yAvailableFields);
-
-    // 更新X轴显示字段列表
-    const xDisplaySelect = document.getElementById('xDisplayField');
-    xDisplaySelect.innerHTML = '';
-    xAvailableFields.forEach(field => {
-        const option = new Option(
-            field === 'order_id' ? '顺序ID' : field,
-            field
-        );
-        xDisplaySelect.add(option);
-    });
-    xDisplaySelect.value = defaultXField; // 使用匹配到的默认字段
-
-    // 更新Y轴显示字段列表
-    const yDisplaySelect = document.getElementById('yDisplayField');
-    yDisplaySelect.innerHTML = '';
-    yAvailableFields.forEach(field => {
-        const option = new Option(
-            field === 'order_id' ? '顺序ID' : field,
-            field
-        );
-        yDisplaySelect.add(option);
-    });
-    yDisplaySelect.value = defaultYField; // 使用匹配到的默认字段
-
-    // 添加字段选择变化监听器
-    xDisplaySelect.addEventListener('change', function() {
-        updateLabelsAndVisualization();
-    });
-
-    yDisplaySelect.addEventListener('change', function() {
-        updateLabelsAndVisualization();
-    });
-}
-
-
-// 更新标签和可视化（新架构）
-function updateLabelsAndVisualization() {
-    // 使用全局状态
-    if (!globalUIState.dataSource.currentMatrix) return;
-
-    const xField = document.getElementById('xDisplayField').value;
-    const yField = document.getElementById('yDisplayField').value;
-
-    // 更新全局状态的显示字段
-    globalUIState.displayFields.xField = xField;
-    globalUIState.displayFields.yField = yField;
-
-    // *** 只在独占模式下才保存到图表配置 ***
-    if (globalUIState.exclusiveMode.active && globalUIState.exclusiveMode.editingIndex !== null) {
-        const config = allSimilarityResults[globalUIState.exclusiveMode.editingIndex].visualConfig;
-        config.displayFields.xField = xField;
-        config.displayFields.yField = yField;
-        console.log(`[独占模式] 保存显示字段: xField=${xField}, yField=${yField}`);
-    }
-
-    // 使用全局状态的数据生成唯一标签
-    globalUIState.dataSource.currentXLabels = generateUniqueLabels(
-        globalUIState.dataSource.currentXData,
-        xField
-    );
-    globalUIState.dataSource.currentYLabels = generateUniqueLabels(
-        globalUIState.dataSource.currentYData,
-        yField
-    );
-
-    // 同步到旧变量（兼容性）
-    currentXLabels = globalUIState.dataSource.currentXLabels;
-    currentYLabels = globalUIState.dataSource.currentYLabels;
-
-    // 更新热力图
-    updateHeatmap();
-}
-
 // ============================================================================
 // 可视化控制与筛选
 // ============================================================================
@@ -767,14 +709,6 @@ function setTopkAxis(axis) {
     if (filteredMatrix || globalUIState.dataSource.currentMatrix) {
         updateHeatmap();
     }
-}
-
-// 【已废弃】旧的applyTopkFilter函数，保留用于兼容性检查
-// 新架构使用 computeTopKMask() + applyMask() 代替
-function applyTopkFilter_DEPRECATED(matrix, xLabels, yLabels, xData, yData) {
-    console.warn('[已废弃] applyTopkFilter被调用，应使用新的布尔矩阵架构');
-    // 临时兼容实现，直接返回原数据
-    return { matrix, xLabels, yLabels, xData, yData };
 }
 
 // ============================================================================
@@ -877,10 +811,6 @@ async function calculateSimilarity() {
         // *** 新架构：初始化按钮状态数组 ***
         initializeButtonStates();
 
-        // 清空旧的状态
-        selectedMatrixIndices = [];
-        differenceMatrices = {};
-
         // 重置全局UI状态
         globalUIState.dataSource.primaryIndex = null;
         globalUIState.dataSource.subtractIndex = null;
@@ -891,11 +821,19 @@ async function calculateSimilarity() {
 
         // *** 新架构：更新图表列表UI ***
         updateMatrixListUI();
+        updateExportMatrixSelector();
 
         // 显示图表选择控制区域
         document.getElementById('matrixSelectorControl').style.display = 'block';
 
-        showSuccess(`成功计算 ${allSimilarityResults.length} 个相似度矩阵! 请选择要显示的图表`);
+        // *** 新特性：首次计算相似度时自动启用第一张图的独占模式 ***
+        if (allSimilarityResults.length > 0) {
+            console.log('[自动独占] 首次计算相似度，自动启用图0的独占模式');
+            enterExclusiveMode(0);
+            updateMatrixListUI(); // 再次更新UI以反映独占模式状态
+        }
+
+        showSuccess(`成功计算 ${allSimilarityResults.length} 个相似度矩阵! 已自动启用第一张图的编辑模式`);
 
     } catch (error) {
         showError('计算相似度失败: ' + error.message);
@@ -903,381 +841,6 @@ async function calculateSimilarity() {
         showLoading(false);
     }
 }
-
-// 根据索引加载矩阵数据
-function loadMatrixByIndex(index) {
-    if (index < 0 || index >= allSimilarityResults.length) {
-        return;
-    }
-
-    console.log(`[切换图表] 加载图 ${index}`);
-    currentMatrixIndex = index;
-    const matrixData = allSimilarityResults[index];
-    console.log('[切换图表] 配置信息:', matrixData.visualConfig);
-
-    // 更新当前数据
-    currentResult = matrixData.result;
-    originalMatrix = matrixData.matrix;
-    originalXData = matrixData.result.x_data;
-    originalYData = matrixData.result.y_data;
-    xAvailableFields = matrixData.xAvailableFields;
-    yAvailableFields = matrixData.yAvailableFields;
-
-    currentXData = matrixData.xData;
-    currentYData = matrixData.yData;
-
-    // 裁剪矩阵
-    filteredMatrix = originalMatrix.slice(0, currentYData.length)
-        .map(row => row.slice(0, currentXData.length));
-
-    // 更新显示字段控制器
-    updateDisplayFieldControls();
-
-    // *** 关键修改：先更新滑块范围，再应用配置值 ***
-    // 1. 先更新相似度滑块的范围（根据是否差值模式设置0-1或-1-1）
-    updateSimilaritySliderRange();
-
-    // 2. 然后应用该图的可视化配置到UI（包括阈值、Top-K等）
-    applyVisualConfigToUI(matrixData.visualConfig);
-
-    // 使用该图的配置生成标签
-    const xField = matrixData.visualConfig.displayFields.xField;
-    const yField = matrixData.visualConfig.displayFields.yField;
-    currentXLabels = generateUniqueLabels(currentXData, xField);
-    currentYLabels = generateUniqueLabels(currentYData, yField);
-
-    // 更新Top-K滑块的最大值
-    updateTopkSliderMax();
-
-    // 更新可视化 - 先创建基础热力图
-    createHeatmap();
-
-    // 然后应用该图的筛选设置（阈值和Top-K）
-    updateHeatmap();
-
-    // 显示统计信息
-    showStatistics(matrixData.stats);
-}
-
-// ============================================================================
-// 多图选择与切换
-// ============================================================================
-
-function updateMatrixSelector() {
-    if (allSimilarityResults.length === 0) return;
-
-    // 获取所有唯一的X和Y collections
-    const xCollections = [...new Set(allSimilarityResults.map(r => r.xCollection))];
-    const yCollections = [...new Set(allSimilarityResults.map(r => r.yCollection))];
-
-    // 创建按钮表格
-    const table = document.getElementById('matrixButtonTable');
-    table.innerHTML = '';
-
-    // 创建表头行
-    const headerRow = document.createElement('tr');
-    headerRow.innerHTML = '<th></th>'; // 左上角空单元格
-    xCollections.forEach(xCol => {
-        const th = document.createElement('th');
-        th.textContent = xCol;
-        headerRow.appendChild(th);
-    });
-    table.appendChild(headerRow);
-
-    // 创建数据行
-    yCollections.forEach(yCol => {
-        const row = document.createElement('tr');
-
-        // 第一列：Y collection名称
-        const labelCell = document.createElement('td');
-        labelCell.textContent = yCol;
-        row.appendChild(labelCell);
-
-        // 其他列：按钮
-        xCollections.forEach(xCol => {
-            const cell = document.createElement('td');
-
-            // 查找对应的矩阵索引
-            const matrixIndex = allSimilarityResults.findIndex(
-                r => r.xCollection === xCol && r.yCollection === yCol
-            );
-
-            if (matrixIndex >= 0) {
-                const btn = document.createElement('button');
-                btn.className = 'matrix-selection-btn';
-                btn.textContent = '显示';
-                btn.dataset.index = matrixIndex;
-                btn.onclick = function() {
-                    handleMatrixButtonClick(matrixIndex);
-                };
-                cell.appendChild(btn);
-            } else {
-                cell.textContent = '-';
-            }
-
-            row.appendChild(cell);
-        });
-
-        table.appendChild(row);
-    });
-
-    // 显示控制区域
-    document.getElementById('matrixSelectorControl').style.display = 'block';
-}
-
-// 新增：处理矩阵按钮点击
-function handleMatrixButtonClick(clickedIndex) {
-    const buttons = document.querySelectorAll('.matrix-selection-btn');
-
-    // 情况1: 未选中任何矩阵
-    if (selectedMatrixIndices.length === 0) {
-        selectedMatrixIndices = [clickedIndex];
-        updateButtonStates();
-        loadMatrixByIndex(clickedIndex);
-        updateSelectionInfo();
-        return;
-    }
-
-    // 情况2: 点击的是已选中的按钮
-    if (selectedMatrixIndices.includes(clickedIndex)) {
-        selectedMatrixIndices = selectedMatrixIndices.filter(idx => idx !== clickedIndex);
-
-        if (selectedMatrixIndices.length === 0) {
-            // 全部取消选择
-            updateButtonStates();
-            updateSelectionInfo();
-        } else {
-            // 还有其他选中的按钮，显示剩余的
-            updateButtonStates();
-            loadMatrixByIndex(selectedMatrixIndices[0]);
-            updateSelectionInfo();
-        }
-        return;
-    }
-
-    // 情况3: 已有一个选中，点击另一个
-    if (selectedMatrixIndices.length === 1) {
-        const firstIndex = selectedMatrixIndices[0];
-        const firstMatrix = allSimilarityResults[firstIndex];
-        const clickedMatrix = allSimilarityResults[clickedIndex];
-
-        // 检查矩阵大小是否相同
-        const sameSize = (
-            firstMatrix.matrix.length === clickedMatrix.matrix.length &&
-            firstMatrix.matrix[0].length === clickedMatrix.matrix[0].length
-        );
-
-        if (sameSize) {
-            // 大小相同：显示差值
-            selectedMatrixIndices = [firstIndex, clickedIndex];
-            updateButtonStates();
-            loadDifferenceMatrix(firstIndex, clickedIndex);
-            updateSelectionInfo();
-        } else {
-            // 大小不同：替换选择
-            selectedMatrixIndices = [clickedIndex];
-            updateButtonStates();
-            loadMatrixByIndex(clickedIndex);
-            updateSelectionInfo();
-        }
-        return;
-    }
-
-    // 情况4: 已有两个选中（差值状态），点击新的
-    if (selectedMatrixIndices.length === 2) {
-        selectedMatrixIndices = [clickedIndex];
-        updateButtonStates();
-        loadMatrixByIndex(clickedIndex);
-        updateSelectionInfo();
-        return;
-    }
-}
-
-// 新增：更新按钮状态
-function updateButtonStates() {
-    const buttons = document.querySelectorAll('.matrix-selection-btn');
-
-    buttons.forEach(btn => {
-        const index = parseInt(btn.dataset.index);
-        btn.classList.remove('selected', 'selected-secondary', 'difference');
-
-        if (selectedMatrixIndices.length === 1 && selectedMatrixIndices[0] === index) {
-            btn.classList.add('selected');
-            btn.textContent = '已选';
-        } else if (selectedMatrixIndices.length === 2) {
-            if (selectedMatrixIndices[0] === index) {
-                btn.classList.add('selected');
-                btn.textContent = '被减';
-            } else if (selectedMatrixIndices[1] === index) {
-                btn.classList.add('selected-secondary');
-                btn.textContent = '减数';
-            }
-        } else {
-            btn.textContent = '显示';
-        }
-    });
-}
-
-// 更新选择信息显示
-function updateSelectionInfo() {
-    const infoDiv = document.getElementById('matrixSelectionInfo');
-    const textSpan = document.getElementById('selectedMatrixText');
-
-    if (selectedMatrixIndices.length === 0) {
-        infoDiv.style.display = 'none';
-        return;
-    }
-
-    infoDiv.style.display = 'block';
-
-    if (selectedMatrixIndices.length === 1) {
-        const matrix = allSimilarityResults[selectedMatrixIndices[0]];
-        textSpan.textContent = `当前显示: ${matrix.xCollection} vs ${matrix.yCollection}`;
-    } else if (selectedMatrixIndices.length === 2) {
-        const matrix1 = allSimilarityResults[selectedMatrixIndices[0]];
-        const matrix2 = allSimilarityResults[selectedMatrixIndices[1]];
-        textSpan.innerHTML = `差值模式: <br>(${matrix1.xCollection} vs ${matrix1.yCollection}) - (${matrix2.xCollection} vs ${matrix2.yCollection})`;
-    }
-}
-
-// 加载差值矩阵
-function loadDifferenceMatrix(index1, index2) {
-    const cacheKey = `${index1}-${index2}`;
-
-    // 检查缓存
-    if (!differenceMatrices[cacheKey]) {
-        // 计算差值矩阵
-        const matrix1 = allSimilarityResults[index1].matrix;
-        const matrix2 = allSimilarityResults[index2].matrix;
-
-        const diffMatrix = matrix1.map((row, i) =>
-            row.map((val, j) => val - matrix2[i][j])
-        );
-
-        differenceMatrices[cacheKey] = diffMatrix;
-        // 同时缓存反向差值
-        differenceMatrices[`${index2}-${index1}`] = diffMatrix.map(row =>
-            row.map(val => -val)
-        );
-    }
-
-    // 使用第一个矩阵的数据和字段信息
-    const matrixData = allSimilarityResults[index1];
-    currentResult = matrixData.result;
-    originalMatrix = differenceMatrices[cacheKey];
-    originalXData = matrixData.result.x_data;
-    originalYData = matrixData.result.y_data;
-    xAvailableFields = matrixData.xAvailableFields;
-    yAvailableFields = matrixData.yAvailableFields;
-
-    currentXData = matrixData.xData;
-    currentYData = matrixData.yData;
-
-    filteredMatrix = originalMatrix.slice(0, currentYData.length)
-        .map(row => row.slice(0, currentXData.length));
-
-    updateDisplayFieldControls();
-
-    // *** 关键修改：差值模式使用第一张图的显示字段和筛选器 ***
-    // 1. 先更新相似度滑块的范围（差值模式需要-1到1的范围）
-    updateSimilaritySliderRange();
-
-    // 2. 应用第一张图的可视化配置到UI
-    applyVisualConfigToUI(matrixData.visualConfig);
-
-    // 3. *** 差值模式：强制将阈值重置为 -1 到 1 ***
-    const minSlider = document.getElementById('minSimilaritySlider');
-    const maxSlider = document.getElementById('maxSimilaritySlider');
-    const minInput = document.getElementById('minSimilarityInput');
-    const maxInput = document.getElementById('maxSimilarityInput');
-
-    minSlider.value = -1;
-    maxSlider.value = 1;
-    minInput.value = -1;
-    maxInput.value = 1;
-
-    document.getElementById('minSimilarityValue').textContent = '-1.00';
-    document.getElementById('maxSimilarityValue').textContent = '1.00';
-
-    // 更新滑块轨道
-    const track = document.getElementById('similarityTrack');
-    track.style.left = '0%';
-    track.style.width = '100%';
-
-    console.log('[差值模式] 阈值已重置为 -1.00 到 1.00');
-
-    // 使用第一张图的配置生成标签
-    const xField = matrixData.visualConfig.displayFields.xField;
-    const yField = matrixData.visualConfig.displayFields.yField;
-    currentXLabels = generateUniqueLabels(currentXData, xField);
-    currentYLabels = generateUniqueLabels(currentYData, yField);
-
-    updateTopkSliderMax();
-
-    // 更新可视化 - 先创建基础热力图
-    createHeatmap();
-
-    // 然后应用该图的筛选设置（阈值和Top-K）
-    updateHeatmap();
-
-    // 显示差值矩阵的统计信息
-    showDifferenceStatistics(originalMatrix);
-}
-
-// 新增：显示差值统计信息
-function showDifferenceStatistics(diffMatrix) {
-    const statsSection = document.getElementById('statsSection');
-    const statsGrid = document.getElementById('statsGrid');
-
-    // 计算差值矩阵的统计信息
-    let flatValues = [];
-    diffMatrix.forEach(row => {
-        row.forEach(val => {
-            if (val !== null && val !== undefined) {
-                flatValues.push(val);
-            }
-        });
-    });
-
-    const totalPairs = flatValues.length;
-    const avgDiff = flatValues.reduce((a, b) => a + b, 0) / totalPairs;
-    const maxDiff = Math.max(...flatValues);
-    const minDiff = Math.min(...flatValues);
-
-    const currentDisplayCount = getCurrentDisplayCount();
-
-    statsGrid.innerHTML = `
-        <div class="stat-item">
-            <div class="value">${totalPairs}</div>
-            <div class="label">总对比数</div>
-        </div>
-        <div class="stat-item">
-            <div class="value" id="currentDisplayCount">${currentDisplayCount}</div>
-            <div class="label">当前显示对比数</div>
-        </div>
-        <div class="stat-item">
-            <div class="value">${avgDiff.toFixed(3)}</div>
-            <div class="label">平均差值</div>
-        </div>
-        <div class="stat-item">
-            <div class="value">${maxDiff.toFixed(3)}</div>
-            <div class="label">最大差值</div>
-        </div>
-        <div class="stat-item">
-            <div class="value">${minDiff.toFixed(3)}</div>
-            <div class="label">最小差值</div>
-        </div>
-        <div class="stat-item">
-            <div class="value">差值模式</div>
-            <div class="label">当前模式</div>
-        </div>
-    `;
-
-    statsSection.style.display = 'block';
-    operationsSection.style.display = 'block';
-}
-
-
 
 // ============================================================================
 // 可视化更新与渲染
@@ -1325,11 +888,8 @@ function adjustTopk(delta) {
     const newValue = Math.max(minValue, Math.min(maxValue, currentValue + delta));
     if (newValue !== currentValue) {
         topkSlider.value = newValue;
-        updateTopkDisplay();
-        // 实时更新热力图
-        if (filteredMatrix) {
-            updateHeatmap();
-        }
+        // 手动触发 input 事件，以确保状态同步和缓存失效
+        topkSlider.dispatchEvent(new Event('input'));
     }
 
     // 确保按钮状态正确更新
@@ -1543,55 +1103,6 @@ function updateHeatmapData(matrix, xLabels, yLabels, preserveLayout = null) {
         createHeatmap(matrix, xLabels, yLabels);
     }
 }
-
-// 更新相似度滑块的范围
-// resetToRange: true=重置为范围边界(range.min, range.max), false=保持当前值
-function updateSimilaritySliderRange(resetToRange = false) {
-    const range = getCurrentSimilarityRange();
-    const minSlider = document.getElementById('minSimilaritySlider');
-    const maxSlider = document.getElementById('maxSimilaritySlider');
-    const minInput = document.getElementById('minSimilarityInput');
-    const maxInput = document.getElementById('maxSimilarityInput');
-
-    // 更新滑块范围属性
-    minSlider.min = range.min;
-    minSlider.max = range.max;
-    minSlider.step = 0.01;
-
-    maxSlider.min = range.min;
-    maxSlider.max = range.max;
-    maxSlider.step = 0.01;
-
-    // 更新输入框范围属性
-    minInput.min = range.min;
-    minInput.max = range.max;
-
-    maxInput.min = range.min;
-    maxInput.max = range.max;
-
-    // 根据参数决定是重置还是保持当前值
-    if (resetToRange) {
-        // 重置为范围边界
-        minSlider.value = range.min;
-        maxSlider.value = range.max;
-    }
-    // 如果不重置，滑块值保持不变（会由后续的 applyVisualConfigToUI 设置）
-
-    minInput.value = minSlider.value;
-    maxInput.value = maxSlider.value;
-
-    // 更新显示
-    document.getElementById('minSimilarityValue').textContent = parseFloat(minSlider.value).toFixed(2);
-    document.getElementById('maxSimilarityValue').textContent = parseFloat(maxSlider.value).toFixed(2);
-
-    // 更新track位置
-    const track = document.getElementById('similarityTrack');
-    const percent1 = ((parseFloat(minSlider.value) - range.min) / (range.max - range.min)) * 100;
-    const percent2 = ((parseFloat(maxSlider.value) - range.min) / (range.max - range.min)) * 100;
-    track.style.left = percent1 + '%';
-    track.style.width = (percent2 - percent1) + '%';
-}
-
 
 // 更新当前显示对比数统计
 function updateCurrentDisplayStat() {
@@ -2105,216 +1616,6 @@ function getSimilarityColor(similarity, colorScheme) {
 // 导出功能
 // ============================================================================
 
-// 导出Excel功能
-async function exportToExcel() {
-    if (!filteredMatrix) {
-        showError('没有可导出的数据，请先计算相似度');
-        return;
-    }
-
-    try {
-        // 显示导出状态
-        const exportBtn = document.getElementById('exportBtn');
-        const originalText = exportBtn.textContent;
-        exportBtn.textContent = '导出中...';
-        exportBtn.disabled = true;
-
-        // 获取当前显示的数据
-        const minSim = parseFloat(document.getElementById('minSimilaritySlider').value);
-        const maxSim = parseFloat(document.getElementById('maxSimilaritySlider').value);
-        const sortOrder = document.getElementById('sortOrder').value;
-
-        // 应用过滤和排序
-        let thresholdMatrix = filteredMatrix.map(row =>
-            row.map(val => (val >= minSim && val <= maxSim) ? val : null)
-        );
-
-        let topkResult = applyTopkFilter(thresholdMatrix, currentXLabels, currentYLabels, currentXData, currentYData);
-        let displayMatrix = topkResult.matrix;
-        let displayXLabels = [...topkResult.xLabels];
-        let displayYLabels = [...topkResult.yLabels];
-        let displayXData = [...topkResult.xData];
-        let displayYData = [...topkResult.yData];
-
-        // 应用排序
-        if (sortOrder !== 'none') {
-            const sortedData = applySorting(displayMatrix, displayXLabels, displayYLabels, displayXData, displayYData, sortOrder);
-            displayMatrix = sortedData.matrix;
-            displayXLabels = sortedData.xLabels;
-            displayYLabels = sortedData.yLabels;
-        }
-
-        // 创建Excel工作簿
-        const workbook = new ExcelJS.Workbook();
-        const worksheet = workbook.addWorksheet('相似度矩阵');
-
-        // 获取当前显示字段信息
-        const xCollection = document.getElementById('xCollection').value;
-        const yCollection = document.getElementById('yCollection').value;
-        const xDisplayField = document.getElementById('xDisplayField').value;
-        const yDisplayField = document.getElementById('yDisplayField').value;
-
-        const xFieldName = xDisplayField === 'order_id' ? '顺序ID' : xDisplayField;
-        const yFieldName = yDisplayField === 'order_id' ? '顺序ID' : yDisplayField;
-
-        // 设置表头：第一行
-        const headerRow = [''];
-        displayXLabels.forEach(label => {
-            // 移除零宽字符用于Excel显示
-            const cleanLabel = label.replace(/[\u200B\u00A0]/g, '');
-            headerRow.push(cleanLabel);
-        });
-        worksheet.addRow(headerRow);
-
-        // 填充数据行
-        displayMatrix.forEach((row, rowIndex) => {
-            const dataRow = [];
-            // 第一列：Y轴标签
-            const cleanYLabel = displayYLabels[rowIndex].replace(/[\u200B\u00A0]/g, '');
-            dataRow.push(cleanYLabel);
-
-            // 其余列：相似度数据
-            row.forEach((similarity) => {
-                dataRow.push(similarity);
-            });
-            worksheet.addRow(dataRow);
-        });
-
-        // 设置第一行和第一列为冻结窗格
-        worksheet.views = [{
-            state: 'frozen',
-            xSplit: 1,  // 冻结第一列
-            ySplit: 1   // 冻结第一行
-        }];
-
-        // 设置表头样式
-        const headerRowObj = worksheet.getRow(1);
-        headerRowObj.eachCell((cell, colNumber) => {
-            cell.fill = {
-                type: 'pattern',
-                pattern: 'solid',
-                fgColor: { argb: 'FF0D6EFD' }
-            };
-            cell.font = {
-                color: { argb: 'FFFFFFFF' },
-                bold: true
-            };
-            cell.alignment = {
-                horizontal: 'center',
-                vertical: 'middle'
-            };
-        });
-
-        // 设置第一列样式（Y轴标签）
-        for (let rowIndex = 2; rowIndex <= displayMatrix.length + 1; rowIndex++) {
-            const cell = worksheet.getCell(rowIndex, 1);
-            cell.fill = {
-                type: 'pattern',
-                pattern: 'solid',
-                fgColor: { argb: 'FF0D6EFD' }
-            };
-            cell.font = {
-                color: { argb: 'FFFFFFFF' },
-                bold: true
-            };
-            cell.alignment = {
-                horizontal: 'center',
-                vertical: 'middle'
-            };
-        }
-
-        // 为相似度数据单元格设置颜色和格式
-        for (let rowIndex = 0; rowIndex < displayMatrix.length; rowIndex++) {
-            for (let colIndex = 0; colIndex < displayMatrix[rowIndex].length; colIndex++) {
-                const similarity = displayMatrix[rowIndex][colIndex];
-                const excelRow = rowIndex + 2; // Excel行从2开始（第1行是表头）
-                const excelCol = colIndex + 2; // Excel列从2开始（第1列是Y轴标签）
-
-                const cell = worksheet.getCell(excelRow, excelCol);
-
-                if (similarity !== null && similarity !== undefined) {
-                    // 设置数值和格式
-                    cell.value = similarity;
-                    cell.numFmt = '0.0000';
-
-                    // 根据相似度和当前颜色方案设置背景色
-                    const color = getSimilarityColor(similarity, currentColorScheme);
-                    const argbColor = `FF${color.r.toString(16).padStart(2, '0')}${color.g.toString(16).padStart(2, '0')}${color.b.toString(16).padStart(2, '0')}`;
-
-                    cell.fill = {
-                        type: 'pattern',
-                        pattern: 'solid',
-                        fgColor: { argb: argbColor }
-                    };
-
-                    // 根据背景色亮度调整文字颜色
-                    const brightness = (color.r * 299 + color.g * 587 + color.b * 114) / 1000;
-                    cell.font = {
-                        color: { argb: brightness > 128 ? 'FF000000' : 'FFFFFFFF' },
-                        size: 10
-                    };
-                } else {
-                    // 无数据的单元格
-                    cell.value = '';
-                    cell.fill = {
-                        type: 'pattern',
-                        pattern: 'solid',
-                        fgColor: { argb: 'FFFFFFFF' }
-                    };
-                }
-
-                // 设置单元格边框和对齐方式
-                cell.border = {
-                    top: { style: 'thin' },
-                    left: { style: 'thin' },
-                    bottom: { style: 'thin' },
-                    right: { style: 'thin' }
-                };
-                cell.alignment = {
-                    horizontal: 'center',
-                    vertical: 'middle'
-                };
-            }
-        }
-
-        // 自动调整列宽
-        worksheet.columns.forEach((column) => {
-            column.width = 15;
-        });
-
-        // 设置第一列稍微宽一些以容纳标签
-        worksheet.getColumn(1).width = 20;
-
-        // 生成文件名
-        const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-        const filename = `相似度矩阵_${xCollection}_vs_${yCollection}_${timestamp}.xlsx`;
-
-        // 导出Excel文件
-        const buffer = await workbook.xlsx.writeBuffer();
-        const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-        const url = window.URL.createObjectURL(blob);
-
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = filename;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        window.URL.revokeObjectURL(url);
-
-        showSuccess(`Excel文件导出成功：${filename}`);
-
-    } catch (error) {
-        console.error('导出Excel时出错:', error);
-        showError('导出Excel失败: ' + error.message);
-    } finally {
-        // 恢复按钮状态
-        const exportBtn = document.getElementById('exportBtn');
-        exportBtn.textContent = '导出Excel';  // 直接设置为固定文本，更可靠
-        exportBtn.disabled = false;
-    }
-}
-
 
 // 导出JSON功能
 async function exportToJSON() {
@@ -2330,50 +1631,57 @@ async function exportToJSON() {
         exportBtn.textContent = '导出中...';
         exportBtn.disabled = true;
 
-        // 获取所有选中的X和Y collections
-        const xSelects = document.querySelectorAll('.x-collection-select');
-        const xCollections = Array.from(xSelects)
-            .map(select => select.value)
-            .filter(value => value !== '');
+        // 获取选中要导出的图表索引
+        const exportSelect = document.getElementById('exportMatrixSelect');
+        const selectedIndex = parseInt(exportSelect.value);
 
-        const ySelects = document.querySelectorAll('.y-collection-select');
-        const yCollections = Array.from(ySelects)
-            .map(select => select.value)
-            .filter(value => value !== '');
+        if (isNaN(selectedIndex) || selectedIndex < 0 || selectedIndex >= allSimilarityResults.length) {
+            showError('请选择要导出的图表');
+            return;
+        }
 
-        // 构建完整的导出数据结构
+        // 获取选中的图表数据
+        const selectedResult = allSimilarityResults[selectedIndex];
+
+        // 构建导出数据结构
+        // 注意: 这里导出的是 visualConfig 中的原始数值配置，而不是布尔矩阵
         const exportData = {
             version: "1.0",
             timestamp: new Date().toISOString(),
-            config: {
-                xCollections: xCollections,
-                yCollections: yCollections,
-                xMaxItems: parseInt(document.getElementById('xMaxItems').value) || 30,
-                yMaxItems: parseInt(document.getElementById('yMaxItems').value) || 30
+            exportedMatrix: {
+                index: selectedIndex,
+                xCollection: selectedResult.xCollection,
+                yCollection: selectedResult.yCollection,
+                matrix: selectedResult.matrix,  // 原始相似度矩阵
+                xData: selectedResult.xData,
+                yData: selectedResult.yData,
+                xAvailableFields: selectedResult.xAvailableFields,
+                yAvailableFields: selectedResult.yAvailableFields,
+                stats: selectedResult.stats
             },
-            results: allSimilarityResults.map(result => ({
-                xCollection: result.xCollection,
-                yCollection: result.yCollection,
-                matrix: result.matrix,
-                xData: result.xData,
-                yData: result.yData,
-                xAvailableFields: result.xAvailableFields,
-                yAvailableFields: result.yAvailableFields,
-                stats: result.stats
-            })),
-            displaySettings: {
-                xDisplayField: document.getElementById('xDisplayField').value,
-                yDisplayField: document.getElementById('yDisplayField').value,
-                minSimilarity: parseFloat(document.getElementById('minSimilaritySlider').value),
-                maxSimilarity: parseFloat(document.getElementById('maxSimilaritySlider').value),
-                topkValue: parseInt(document.getElementById('topkSlider').value),
-                topkAxis: currentTopkAxis,
-                sortOrder: document.getElementById('sortOrder').value,
-                colorScheme: currentColorScheme
-            },
-            matrixSelection: {
-                selectedMatrixIndices: selectedMatrixIndices,
-                currentMatrixIndex: currentMatrixIndex
+            // 导出该图的可视化配置（包含原始的数值配置）
+            visualConfig: {
+                displayFields: {
+                    xField: selectedResult.visualConfig.displayFields.xField,
+                    yField: selectedResult.visualConfig.displayFields.yField
+                },
+                // 导出原始阈值配置（数值形式）
+                similarityRange: {
+                    min: selectedResult.visualConfig.similarityRange.min,
+                    max: selectedResult.visualConfig.similarityRange.max
+                },
+                // 导出原始 Top-K 配置（数值形式）
+                filters: {
+                    topK: {
+                        value: selectedResult.visualConfig.filters.topK.value,
+                        axis: selectedResult.visualConfig.filters.topK.axis
+                    }
+                },
+                // 导出排序配置
+                sorting: {
+                    order: selectedResult.visualConfig.sorting.order
+                }
+                // 注意: 不导出 cachedMasks (布尔矩阵缓存)，因为它们是计算中间结果
             }
         };
 
@@ -2382,7 +1690,7 @@ async function exportToJSON() {
 
         // 生成文件名
         const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-        const filename = `相似度分析_完整_${timestamp}.json`;
+        const filename = `相似度分析_图${selectedIndex + 1}_${selectedResult.xCollection}_vs_${selectedResult.yCollection}_${timestamp}.json`;
 
         // 创建Blob并下载
         const blob = new Blob([jsonString], { type: 'application/json' });
@@ -2407,6 +1715,242 @@ async function exportToJSON() {
         exportBtn.textContent = '导出JSON';
         exportBtn.disabled = false;
     }
+}
+
+// ============================================================================
+// 导入功能
+// ============================================================================
+
+/**
+ * 触发文件选择器
+ */
+function triggerImportJSON() {
+    const fileInput = document.getElementById('importFileInput');
+    if (fileInput) {
+        // 重置文件输入,允许重复导入同一个文件
+        fileInput.value = '';
+        fileInput.click();
+    }
+}
+
+/**
+ * 处理导入的文件
+ */
+async function handleImportFile(event) {
+    const file = event.target.files[0];
+    if (!file) {
+        return;
+    }
+
+    // 检查文件类型
+    if (!file.name.endsWith('.json')) {
+        showError('请选择JSON文件');
+        return;
+    }
+
+    try {
+        showLoading(true, '正在导入数据...');
+
+        // 读取文件内容
+        const fileContent = await readFileAsText(file);
+
+        // 解析JSON
+        let importedData;
+        try {
+            importedData = JSON.parse(fileContent);
+        } catch (e) {
+            showError('JSON文件格式错误: ' + e.message);
+            showLoading(false);
+            return;
+        }
+
+        // 验证数据格式
+        const validationError = validateImportedData(importedData);
+        if (validationError) {
+            showError('数据验证失败: ' + validationError);
+            showLoading(false);
+            return;
+        }
+
+        // *** 新特性：记录导入前的图表数量，用于判断是否首次导入 ***
+        const isFirstImport = allSimilarityResults.length === 0;
+
+        // 导入数据到allSimilarityResults
+        importDataToResults(importedData);
+
+        // 初始化新图表的按钮状态
+        const newIndex = allSimilarityResults.length - 1;
+        if (!matrixButtonStates[newIndex]) {
+            matrixButtonStates[newIndex] = {
+                index: newIndex,
+                applyData: false,
+                applyFilter: false,
+                exclusive: false
+            };
+        }
+
+        // 更新UI (使用新架构的函数)
+        updateMatrixListUI();
+        updateExportMatrixSelector();
+
+        // 显示图表选择控制区域
+        document.getElementById('matrixSelectorControl').style.display = 'block';
+        document.getElementById('displayFieldControls').style.display = 'block';
+        document.getElementById('yDisplayFieldControls').style.display = 'block';
+        document.getElementById('statsSection').style.display = 'block';
+        document.getElementById('operationsSection').style.display = 'block';
+
+        // *** 新特性：首次导入数据时自动启用第一张图的独占模式 ***
+        if (isFirstImport && allSimilarityResults.length > 0) {
+            console.log('[自动独占] 首次导入数据，自动启用图0的独占模式');
+            enterExclusiveMode(0);
+            updateMatrixListUI(); // 再次更新UI以反映独占模式状态
+        }
+
+        showSuccess(`成功导入数据: ${importedData.exportedMatrix.xCollection} vs ${importedData.exportedMatrix.yCollection}${isFirstImport ? '，已自动启用编辑模式' : ''}`);
+        showLoading(false);
+
+    } catch (error) {
+        console.error('导入数据时出错:', error);
+        showError('导入出错: ' + error.message);
+        showLoading(false);
+    }
+}
+
+/**
+ * 读取文件为文本
+ */
+function readFileAsText(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = (e) => resolve(e.target.result);
+        reader.onerror = (e) => reject(new Error('文件读取失败'));
+        reader.readAsText(file);
+    });
+}
+
+/**
+ * 验证导入的数据格式
+ */
+function validateImportedData(data) {
+    // 检查版本
+    if (!data.version) {
+        return '缺少版本信息';
+    }
+
+    // 检查exportedMatrix
+    if (!data.exportedMatrix) {
+        return '缺少exportedMatrix字段';
+    }
+
+    const matrix = data.exportedMatrix;
+
+    // 检查必要字段
+    const requiredFields = [
+        'xCollection', 'yCollection', 'matrix',
+        'xData', 'yData',
+        'xAvailableFields', 'yAvailableFields',
+        'stats'
+    ];
+
+    for (const field of requiredFields) {
+        if (!matrix[field]) {
+            return `缺少必要字段: ${field}`;
+        }
+    }
+
+    // 检查数组类型
+    if (!Array.isArray(matrix.matrix)) {
+        return 'matrix必须是数组';
+    }
+    if (!Array.isArray(matrix.xData)) {
+        return 'xData必须是数组';
+    }
+    if (!Array.isArray(matrix.yData)) {
+        return 'yData必须是数组';
+    }
+    if (!Array.isArray(matrix.xAvailableFields)) {
+        return 'xAvailableFields必须是数组';
+    }
+    if (!Array.isArray(matrix.yAvailableFields)) {
+        return 'yAvailableFields必须是数组';
+    }
+
+    // 检查矩阵维度
+    if (matrix.matrix.length !== matrix.yData.length) {
+        return `矩阵行数(${matrix.matrix.length})与yData长度(${matrix.yData.length})不匹配`;
+    }
+
+    if (matrix.matrix.length > 0 && matrix.matrix[0].length !== matrix.xData.length) {
+        return `矩阵列数(${matrix.matrix[0].length})与xData长度(${matrix.xData.length})不匹配`;
+    }
+
+    // 检查visualConfig (可选,如果不存在则使用默认值)
+    if (data.visualConfig) {
+        if (!data.visualConfig.displayFields) {
+            return 'visualConfig缺少displayFields';
+        }
+    }
+
+    return null; // 验证通过
+}
+
+/**
+ * 将导入的数据添加到allSimilarityResults
+ */
+function importDataToResults(importedData) {
+    const matrix = importedData.exportedMatrix;
+
+    // 如果有visualConfig就使用,否则创建默认配置
+    let visualConfig;
+    if (importedData.visualConfig) {
+        // 使用导入的配置,但需要补充cachedMasks
+        visualConfig = {
+            displayFields: {
+                xField: importedData.visualConfig.displayFields.xField,
+                yField: importedData.visualConfig.displayFields.yField
+            },
+            similarityRange: {
+                min: importedData.visualConfig.similarityRange?.min ?? 0,
+                max: importedData.visualConfig.similarityRange?.max ?? 1
+            },
+            filters: {
+                topK: {
+                    value: importedData.visualConfig.filters?.topK?.value ?? 0,
+                    axis: importedData.visualConfig.filters?.topK?.axis ?? 'x'
+                }
+            },
+            sorting: {
+                order: importedData.visualConfig.sorting?.order ?? 'none'
+            },
+            cachedMasks: {
+                thresholdMask: null,
+                topKMask: null,
+                finalMask: null
+            }
+        };
+    } else {
+        // 创建默认配置
+        visualConfig = createDefaultVisualConfig(
+            matrix.xAvailableFields,
+            matrix.yAvailableFields
+        );
+    }
+
+    // 构建结果对象并添加到数组
+    const resultObject = {
+        xCollection: matrix.xCollection,
+        yCollection: matrix.yCollection,
+        matrix: matrix.matrix,
+        xData: matrix.xData,
+        yData: matrix.yData,
+        xAvailableFields: matrix.xAvailableFields,
+        yAvailableFields: matrix.yAvailableFields,
+        stats: matrix.stats,
+        visualConfig: visualConfig
+    };
+
+    allSimilarityResults.push(resultObject);
 }
 
 // ============================================================================
@@ -2457,13 +2001,13 @@ function toggleApplyDataButton(index) {
 
     const currentState = matrixButtonStates[index].applyData;
 
-    // 如果当前是独占模式，先退出
-    if (globalUIState.exclusiveMode.active) {
-        exitExclusiveMode();
-    }
-
     if (currentState) {
         // 当前已启用，要关闭
+        // 如果当前是独占模式，先退出
+        if (globalUIState.exclusiveMode.active) {
+            exitExclusiveMode();
+        }
+
         if (globalUIState.dataSource.primaryIndex === index) {
             // 关闭主数据源
             globalUIState.dataSource.primaryIndex = null;
@@ -2485,7 +2029,19 @@ function toggleApplyDataButton(index) {
             loadDataFromMatrix(globalUIState.dataSource.primaryIndex, false);
         }
     } else {
-        // 当前未启用，要开启
+        // 当前未启用，要开启 - 先检查矩阵大小一致性
+        const sizeCheck = checkMatrixSizeConsistency(index, 'applyData');
+        if (!sizeCheck.isValid) {
+            console.warn(`[应用数据] 矩阵大小检查失败: ${sizeCheck.message}`);
+            showWarning(sizeCheck.message, 4000);
+            return; // 阻止按钮切换，不退出独占模式
+        }
+
+        // 矩阵大小检查通过后，才退出独占模式
+        if (globalUIState.exclusiveMode.active) {
+            exitExclusiveMode();
+        }
+
         if (globalUIState.dataSource.primaryIndex === null) {
             // 没有主数据源，设为主数据源
             globalUIState.dataSource.primaryIndex = index;
@@ -2631,19 +2187,31 @@ function loadDifferenceData(primaryIndex, subtractIndex) {
 function toggleApplyFilterButton(index) {
     console.log(`[应用筛选器] 切换按钮 ${index}`);
 
-    // 如果当前是独占模式，先退出
-    if (globalUIState.exclusiveMode.active) {
-        exitExclusiveMode();
-    }
-
     const currentState = matrixButtonStates[index].applyFilter;
 
     if (currentState) {
         // 当前已启用，要关闭
+        // 如果当前是独占模式，先退出
+        if (globalUIState.exclusiveMode.active) {
+            exitExclusiveMode();
+        }
+
         matrixButtonStates[index].applyFilter = false;
         globalUIState.filters.activeFilterIndices = globalUIState.filters.activeFilterIndices.filter(i => i !== index);
     } else {
-        // 当前未启用，要开启
+        // 当前未启用，要开启 - 先检查矩阵大小一致性
+        const sizeCheck = checkMatrixSizeConsistency(index, 'applyFilter');
+        if (!sizeCheck.isValid) {
+            console.warn(`[应用筛选器] 矩阵大小检查失败: ${sizeCheck.message}`);
+            showWarning(sizeCheck.message, 4000);
+            return; // 阻止按钮切换，不退出独占模式
+        }
+
+        // 矩阵大小检查通过后，才退出独占模式
+        if (globalUIState.exclusiveMode.active) {
+            exitExclusiveMode();
+        }
+
         matrixButtonStates[index].applyFilter = true;
         globalUIState.filters.activeFilterIndices.push(index);
     }
@@ -2763,6 +2331,12 @@ function enterExclusiveMode(index) {
     // 更新UI
     applyFilterStateToUI();
     applySortingStateToUI();
+
+    // 自动选中导出下拉框中的对应图表
+    const exportSelect = document.getElementById('exportMatrixSelect');
+    if (exportSelect) {
+        exportSelect.value = index.toString();
+    }
 
     // 显示提示
     showInfo('已进入独占编辑模式，您的修改将保存到此图的配置中', 3000);
@@ -2889,6 +2463,61 @@ function updateDisplayFieldSelectorsFromGlobalState() {
     ySelect.value = globalUIState.displayFields.yField;
 }
 
+// 新增：显示差值统计信息
+function showDifferenceStatistics(diffMatrix) {
+    const statsSection = document.getElementById('statsSection');
+    const statsGrid = document.getElementById('statsGrid');
+
+    // 计算差值矩阵的统计信息
+    let flatValues = [];
+    diffMatrix.forEach(row => {
+        row.forEach(val => {
+            if (val !== null && val !== undefined) {
+                flatValues.push(val);
+            }
+        });
+    });
+
+    const totalPairs = flatValues.length;
+    const avgDiff = flatValues.reduce((a, b) => a + b, 0) / totalPairs;
+    const maxDiff = Math.max(...flatValues);
+    const minDiff = Math.min(...flatValues);
+
+    const currentDisplayCount = getCurrentDisplayCount();
+
+    statsGrid.innerHTML = `
+        <div class="stat-item">
+            <div class="value">${totalPairs}</div>
+            <div class="label">总对比数</div>
+        </div>
+        <div class="stat-item">
+            <div class="value" id="currentDisplayCount">${currentDisplayCount}</div>
+            <div class="label">当前显示对比数</div>
+        </div>
+        <div class="stat-item">
+            <div class="value">${avgDiff.toFixed(3)}</div>
+            <div class="label">平均差值</div>
+        </div>
+        <div class="stat-item">
+            <div class="value">${maxDiff.toFixed(3)}</div>
+            <div class="label">最大差值</div>
+        </div>
+        <div class="stat-item">
+            <div class="value">${minDiff.toFixed(3)}</div>
+            <div class="label">最小差值</div>
+        </div>
+        <div class="stat-item">
+            <div class="value">差值模式</div>
+            <div class="label">当前模式</div>
+        </div>
+    `;
+
+    statsSection.style.display = 'block';
+    operationsSection.style.display = 'block';
+}
+
+
+
 /**
  * 从全局状态更新热力图
  */
@@ -2982,74 +2611,147 @@ function updateMatrixListUI() {
         row.className = 'matrix-list-item';
         row.dataset.index = index;
 
-        // 图表标题
+        // 确定边框颜色和状态图标
+        let borderClass = '';
+        let badgeIcon = '';
+        let badgeClass = '';
+
+        if (state.exclusive) {
+            // 独占模式 - 紫色边框 + 准星角标
+            borderClass = 'border-exclusive';
+            badgeIcon = 'bi-crosshair';
+            badgeClass = 'badge-crosshair';
+        } else if (globalUIState.dataSource.primaryIndex === index && globalUIState.dataSource.subtractIndex === null) {
+            // 主数据源 - 绿色边框 + 实心圆圈角标
+            borderClass = 'border-primary';
+            badgeIcon = 'bi-circle-fill';
+            badgeClass = 'badge-circle';
+        } else if (globalUIState.dataSource.primaryIndex === index && globalUIState.dataSource.subtractIndex !== null) {
+            // 被减数 - 绿色边框 + 实心加号角标
+            borderClass = 'border-primary';
+            badgeIcon = 'bi-plus-circle-fill';
+            badgeClass = 'badge-plus';
+        } else if (globalUIState.dataSource.subtractIndex === index) {
+            // 减数 - 红色边框 + 实心减号角标
+            borderClass = 'border-subtract';
+            badgeIcon = 'bi-dash-circle-fill';
+            badgeClass = 'badge-minus';
+        } else {
+            // 无状态 - 默认边框 + 灰色方形角标
+            badgeIcon = 'bi-bookmark';
+            badgeClass = 'badge-none';
+        }
+
+        if (borderClass) row.classList.add(borderClass);
+
+        // 创建header容器(包含状态图标、标题和按钮)
+        const header = document.createElement('div');
+        header.className = 'matrix-item-header';
+
+        // 左侧容器(状态图标 + 标题)
+        const leftContainer = document.createElement('div');
+        leftContainer.className = 'matrix-item-left';
+
+        // 状态图标
+        const badge = document.createElement('i');
+        badge.className = `matrix-item-badge ${badgeClass} ${badgeIcon}`;
+        leftContainer.appendChild(badge);
+
+        // 图表标题 - 三行结构
         const title = document.createElement('div');
         title.className = 'matrix-item-title';
-        title.textContent = `${result.xCollection} vs ${result.yCollection}`;
-        title.title = `点击查看详情`;
+
+        const xName = document.createElement('div');
+        xName.className = 'collection-name';
+        xName.textContent = truncateCollectionName(result.xCollection, 20);
+        xName.title = result.xCollection; // 完整名称作为tooltip
+
+        const vsText = document.createElement('div');
+        vsText.className = 'vs-text';
+        vsText.textContent = 'vs';
+
+        const yName = document.createElement('div');
+        yName.className = 'collection-name';
+        yName.textContent = truncateCollectionName(result.yCollection, 20);
+        yName.title = result.yCollection; // 完整名称作为tooltip
+
+        title.appendChild(xName);
+        title.appendChild(vsText);
+        title.appendChild(yName);
+
+        leftContainer.appendChild(title);
 
         // 按钮容器
         const buttonsContainer = document.createElement('div');
         buttonsContainer.className = 'matrix-item-buttons';
 
-        // 按钮1：应用数据
+        // 按钮1：应用数据 - 实心眼睛图标
         const dataBtn = document.createElement('button');
         dataBtn.className = 'matrix-control-btn btn-apply-data';
-        dataBtn.textContent = '应用数据';
-        dataBtn.title = '使用该图的相似度数值';
+        dataBtn.innerHTML = '<i class="bi-eye-fill"></i>';
+        dataBtn.title = '应用数据';
         if (state.applyData) dataBtn.classList.add('active');
         dataBtn.onclick = () => toggleApplyDataButton(index);
 
-        // 按钮2：应用筛选器
+        // 按钮2：应用筛选器 - 筛选图标
         const filterBtn = document.createElement('button');
         filterBtn.className = 'matrix-control-btn btn-apply-filter';
-        filterBtn.textContent = '应用筛选器';
-        filterBtn.title = '使用该图的筛选条件（支持多选-或逻辑）';
+        filterBtn.innerHTML = '<i class="bi-funnel-fill"></i>';
+        filterBtn.title = '应用筛选器';
         if (state.applyFilter) filterBtn.classList.add('active');
         filterBtn.onclick = () => toggleApplyFilterButton(index);
 
-        // 按钮3：独占模式
+        // 按钮3：独占模式 - 准星图标
         const exclusiveBtn = document.createElement('button');
         exclusiveBtn.className = 'matrix-control-btn btn-exclusive';
-        exclusiveBtn.textContent = '独占模式';
-        exclusiveBtn.title = '独占编辑此图的配置';
+        exclusiveBtn.innerHTML = '<i class="bi-crosshair"></i>';
+        exclusiveBtn.title = '独占模式';
         if (state.exclusive) exclusiveBtn.classList.add('active');
         exclusiveBtn.onclick = () => toggleExclusiveModeButton(index);
-
-        // 状态指示器
-        const statusIndicator = document.createElement('div');
-        statusIndicator.className = 'matrix-item-status';
-
-        let statusText = '';
-        if (globalUIState.dataSource.primaryIndex === index && globalUIState.dataSource.subtractIndex === null) {
-            statusText = '主数据源';
-            statusIndicator.classList.add('status-primary');
-        } else if (globalUIState.dataSource.primaryIndex === index && globalUIState.dataSource.subtractIndex !== null) {
-            statusText = '被减数';
-            statusIndicator.classList.add('status-primary');
-        } else if (globalUIState.dataSource.subtractIndex === index) {
-            statusText = '减数';
-            statusIndicator.classList.add('status-subtract');
-        }
-
-        if (state.exclusive) {
-            statusText = '🔒 独占编辑中';
-            statusIndicator.classList.add('status-exclusive');
-        }
-
-        statusIndicator.textContent = statusText;
 
         // 组装
         buttonsContainer.appendChild(dataBtn);
         buttonsContainer.appendChild(filterBtn);
         buttonsContainer.appendChild(exclusiveBtn);
 
-        row.appendChild(title);
-        row.appendChild(statusIndicator);
-        row.appendChild(buttonsContainer);
+        header.appendChild(leftContainer);
+        header.appendChild(buttonsContainer);
 
+        row.appendChild(header);
         container.appendChild(row);
     });
+}
+
+/**
+ * 更新导出图表选择器
+ */
+function updateExportMatrixSelector() {
+    const select = document.getElementById('exportMatrixSelect');
+    if (!select) return;
+
+    // 清空现有选项
+    select.innerHTML = '';
+
+    if (!allSimilarityResults || allSimilarityResults.length === 0) {
+        const option = document.createElement('option');
+        option.value = '';
+        option.textContent = '请先计算相似度';
+        select.appendChild(option);
+        return;
+    }
+
+    // 为每个图表添加选项
+    allSimilarityResults.forEach((result, index) => {
+        const option = document.createElement('option');
+        option.value = index;
+        option.textContent = `图 ${index + 1}: ${result.xCollection} vs ${result.yCollection}`;
+        select.appendChild(option);
+    });
+
+    // 默认选中第一个
+    if (allSimilarityResults.length > 0) {
+        select.value = '0';
+    }
 }
 
 // 页面加载时初始化

@@ -2016,3 +2016,5 @@ url("./fonts/bootstrap-icons.woff?2ab2cbbe07fcebb53bdaa7313bb290f2") format("wof
 .bi-sina-weibo::before { content: "\f8ca"; }
 .bi-tencent-qq::before { content: "\f8cb"; }
 .bi-wikipedia::before { content: "\f8cc"; }
+.bi-crosshair2::before { content: "\f794"; }
+.bi-crosshair::before { content: "\f769"; }

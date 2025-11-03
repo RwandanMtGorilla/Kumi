@@ -5,6 +5,7 @@
 {% block head %}
 <!-- 引入知识库测试页面的样式 -->
 <link rel="stylesheet" href="/static/css/knowledge/test.css">
+<link href="/static/css/bootstrap-icons.css" rel="stylesheet">
 {% endblock %}
 
 {% block content %}
@@ -55,7 +56,9 @@
         </div>
 
         <button class="btn btn-primary" onclick="calculateSimilarity()">计算相似度</button>
+        <button class="btn btn-secondary" onclick="triggerImportJSON()" style="margin-top: 6px;">导入数据</button>
         <button class="btn btn-secondary" onclick="loadCollections()" style="margin-top: 6px;">刷新Collections</button>
+        <input type="file" id="importFileInput" accept=".json" style="display: none;" onchange="handleImportFile(event)">
     </div>
 </div>
 
@@ -148,9 +151,12 @@
                 <div class="control-section" id="operationsSection" style="display: none;">
                     <div class="section-title">结果操作</div>
                     <div class="export-control">
-                        <button class="btn btn-export" id="exportBtn" onclick="exportToExcel()">
-                            导出Excel
-                        </button>
+                        <div class="control-group">
+                            <label for="exportMatrixSelect">选择要导出的图表</label>
+                            <select id="exportMatrixSelect" class="form-control">
+                                <option value="">请先计算相似度</option>
+                            </select>
+                        </div>
                         <button class="btn btn-export" id="exportJsonBtn" onclick="exportToJSON()" style="margin-top: 6px;">
                             导出JSON
                         </button>
@@ -181,11 +187,6 @@
             </div>
         </div>
     </div>
-
-    <div id="errorMessage" class="message error"></div>
-    <div id="successMessage" class="message success"></div>
-    <div id="warningMessage" class="message warning"></div>
-    <div id="infoMessage" class="message info"></div>
 </div>
 
 <!-- 引入 Plotly.js 和其他依赖库 -->
@@ -193,6 +194,6 @@
 <script src="/static/js/plotly-js-2-26-0/plotly.min.js"></script>
 
 <!-- 引入知识库测试页面的脚本 -->
-<script src="/static/js/knowledge/test.js?v=1.1"></script>
+<script src="/static/js/knowledge/test.js?v=1.2"></script>
 
 {% endblock %}
