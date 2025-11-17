@@ -1,14 +1,22 @@
 # KUMI
-项目目标: 可视化的知识库测试；dify/coze 等工作流搭建平台的补充工具
+项目目标: 可视化的知识库测试，为您快速完成知识库效果评估
 
-![front_end_test.png](images/front_end_test.png)
+![单图测试.png](images/单图测试.png)
+
+![多图对比.png](images/多图对比.png)
 
 ## 功能:
-1. 更自由化的知识库构建（清洗 切分） 暴露api接口给平台调用
-2. 高可视化的测评 自动化测试（embedding llm 前者直接进行本地召回操作 后者调用dify api）
+1. 高可视化的测评 自动化测试（embedding llm 前者直接进行本地召回操作 节省计算开支 后者调用dify api）
+2. 更自由化的知识库构建（清洗 切分），支持以xlsx，csv，json等类表格格式导入切分完成的数据 暴露api接口给平台调用
 3. 启动必要的插件接口（在网络层）
 
+
+
 ## 部署方法
+<details id="部署方法">
+<summary><strong>👉 点击展开：部署方法</strong></summary>
+<br>
+
 以下包含三个部分 KUMI 知识库 向量化API。三者通过网络层连接，以下仅为方便部署举例，实际使用过程中知识库和向量化API可改为自己的。
 
 ### KUMI
@@ -28,7 +36,7 @@ cp settings/.env.example settings/.env
 
 # 先等chroma和向量化 都启动了再执行这步
 uv run scripts/start_dev.py
-# 随后访问 127.0.0.1:8000 以访问Kumi界面
+# 随后访问 127.0.0.1:8000/web 以访问Kumi界面 密码为.env文件中预先配置的 ADMIN_USER_NAME 和 ADMIN_PASSWORD
 ```
 
 ### 启动chroma
@@ -68,11 +76,22 @@ modelscope download --model Qwen/Qwen3-Embedding-0.6B --local_dir ./Qwen3-Embedd
 uv run embedding-api-qwen3_ST.py
 ```
 
+</details>
+
 ## 讨论群
+<details id="讨论群">
+<summary><strong>👉 点击展开：讨论群</strong></summary>
+<br>
 
 ![讨论群二维码](images/wechat_image_11-4.jpg)
 
+</details>
+
 ## 代码结构
+<details id="代码结构">
+<summary><strong>👉 点击展开：代码结构</strong></summary>
+<br>
+
 ```md
 KUMI/
 ├── README.md
@@ -165,6 +184,7 @@ KUMI/
 │ └── health_check.py # 健康检查脚本
 └── main.py
 ```
+</details>
 
 ## 致谢
 - 本项目启发自 [jina-ai/correlations](https://github.com/jina-ai/correlations)

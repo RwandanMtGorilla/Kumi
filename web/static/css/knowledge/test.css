@@ -5,26 +5,310 @@
     box-sizing: border-box;
 }
 
+/* 覆盖父级main-content的margin-top，让test页面完全控制布局 */
+.main-content:has(.test-container) {
+    margin-top: 60px !important; /* 只保留导航栏高度的margin */
+    padding: 0 !important; /* 移除main的padding */
+}
+
+/* 覆盖container-fluid的padding */
+.container-fluid:has(.test-container) {
+    padding: 0 !important; /* 移除container-fluid的padding */
+}
+
+/* 只针对包含test-container的#pageContent */
+#pageContent:has(.test-container) {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: calc(100vh - 60px); /* 全屏减去导航栏高度 */
+}
+
 .test-container {
     max-width: 100%;
     margin: 0;
-    padding: 8px;
-    height: calc(100vh - 60px); /* 减去顶部导航栏高度 */
+    padding: 0;
+    height: 100%; /* 填充父容器高度 */
     overflow: hidden;
+    display: flex;
+    background-color: #f5f5f5;
 }
 
-.main-layout {
-    display: grid;
-    grid-template-columns: 340px 1fr;
+/* ============================================================================ */
+/* 动态侧边栏布局样式 */
+/* ============================================================================ */
+
+/* 左侧区域 */
+.left-section {
+    display: flex;
+    flex-shrink: 0;
+}
+
+/* 左侧图标栏 */
+.left-icon-bar {
+    width: 48px;
+    background-color: white;
+    border-right: 1px solid #e9ecef;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 0;
+}
+
+/* 左侧内容面板 */
+.left-sidebar {
+    width: 0;
+    background-color: white;
+    color: #404040;
+    overflow: hidden;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    border-right: 1px solid #e9ecef;
+}
+
+.left-sidebar.open {
+    width: 320px;
+}
+
+/* 右侧区域 */
+.right-section {
+    display: flex;
+    flex-shrink: 0;
+    flex-direction: row-reverse;
+}
+
+/* 右侧图标栏 */
+.right-icon-bar {
+    width: 48px;
+    background-color: white;
+    border-left: 1px solid #e9ecef;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 0;
+}
+
+/* 右侧内容面板 */
+.right-sidebar {
+    width: 0;
+    background-color: white;
+    color: #404040;
+    overflow: hidden;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    border-left: 1px solid #e9ecef;
+}
+
+.right-sidebar.open {
+    width: 320px;
+}
+
+/* 图标分组 */
+.icon-group-top,
+.icon-group-bottom {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
     gap: 8px;
+}
+
+/* 图标按钮样式 */
+.icon-btn {
+    width: 36px;
+    height: 36px;
+    background-color: #f8f9fa;
+    border: none;
+    border-radius: 4px;
+    cursor: grab;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #6c757d;
+    font-size: 18px;
+    transition: all 0.2s;
+    user-select: none;
+}
+
+.icon-btn:hover {
+    background-color: #e9ecef;
+    color: #495057;
+}
+
+.icon-btn.active {
+    background-color: #6666FF;
+    color: white;
+    box-shadow: 0 0 0 2px rgba(102, 102, 255, 0.3);
+}
+
+.icon-btn.dragging {
+    opacity: 0.5;
+    cursor: grabbing;
+}
+
+/* 拖动时的幽灵图标 */
+.drag-ghost {
+    position: fixed;
+    width: 36px;
+    height: 36px;
+    background-color: #6666FF;
+    border: 2px solid #8888FF;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 18px;
+    pointer-events: none;
+    z-index: 10000;
+    opacity: 0.9;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    transform: translate(-50%, -50%);
+}
+
+/* 拖动占位符 */
+.drop-indicator {
+    width: 36px;
+    height: 4px;
+    background-color: #6666FF;
+    border-radius: 2px;
+    margin: 4px 0;
+    opacity: 0.8;
+    animation: pulseIndicator 1s ease-in-out infinite;
+}
+
+@keyframes pulseIndicator {
+    0%, 100% {
+        opacity: 0.8;
+    }
+    50% {
+        opacity: 0.4;
+    }
+}
+
+/* 主内容区域 */
+.main-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    min-width: 0;
+    padding: 0;
+    margin: 0;
+}
+
+/* 侧边栏上下内容区域 */
+.sidebar-content-top,
+.sidebar-content-bottom {
+    padding: 15px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    min-width: 320px;
+    flex: 1;
+    display: none;
+    position: relative;
+    isolation: isolate;
+}
+
+/* 侧边栏面板样式 */
+.sidebar-panel {
+    width: 100%;
     height: 100%;
 }
 
-.sidebar {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    overflow-y: auto;
+/* 当区域有内容时显示 */
+.sidebar-content-top.active,
+.sidebar-content-bottom.active {
+    display: block;
+}
+
+/* 当只有一个区域激活时占据全部空间 */
+.sidebar-content-top.active.full-height,
+.sidebar-content-bottom.active.full-height {
+    flex: 1;
+}
+
+/* 当两个区域都激活时按比例分配 */
+.sidebar-content-top.active:not(.full-height),
+.sidebar-content-bottom.active:not(.full-height) {
+    flex: 0 0 auto;
+}
+
+/* 拖动手柄 */
+.resize-handle {
+    width: 4px;
+    background-color: transparent;
+    cursor: col-resize;
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    z-index: 100;
+    transition: background-color 0.2s;
+    pointer-events: auto;
+}
+
+.resize-handle:hover,
+.resize-handle.dragging {
+    background-color: #6666FF;
+}
+
+.left-sidebar .resize-handle {
+    right: 0;
+}
+
+.right-sidebar .resize-handle {
+    left: 0;
+}
+
+/* 垂直拖动手柄 (上下分区之间) */
+.vertical-resize-handle {
+    height: 4px;
+    background-color: #e9ecef;
+    cursor: row-resize;
+    position: relative;
+    z-index: 100;
+    transition: background-color 0.2s;
+    display: none;
+    flex-shrink: 0;
+    border-top: 1px solid #dee2e6;
+    border-bottom: 1px solid #f8f9fa;
+    pointer-events: auto;
+}
+
+.vertical-resize-handle.active {
+    display: block;
+}
+
+.vertical-resize-handle:hover,
+.vertical-resize-handle.dragging {
+    background-color: #6666FF;
+    border-top: 1px solid #5555DD;
+    border-bottom: 1px solid #7777FF;
+}
+
+/* 滚动条美化 */
+.sidebar-content-top::-webkit-scrollbar,
+.sidebar-content-bottom::-webkit-scrollbar {
+    width: 8px;
+}
+
+.sidebar-content-top::-webkit-scrollbar-track,
+.sidebar-content-bottom::-webkit-scrollbar-track {
+    background: #f1f1f1;
+}
+
+.sidebar-content-top::-webkit-scrollbar-thumb,
+.sidebar-content-bottom::-webkit-scrollbar-thumb {
+    background: #c1c1c1;
+    border-radius: 4px;
+}
+
+.sidebar-content-top::-webkit-scrollbar-thumb:hover,
+.sidebar-content-bottom::-webkit-scrollbar-thumb:hover {
+    background: #a1a1a1;
 }
 
 .control-panel {
@@ -165,7 +449,8 @@ background: #5553FF;
     border: 1px solid #e9ecef;
     display: flex;
     flex-direction: column;
-    height: 100%;
+    flex: 1;
+    margin: 0;
 }
 
 .heatmap-controls {
@@ -225,31 +510,40 @@ transform: scale(1.05);
     position: relative;
     min-height: 0;
     width: 100%;
-    height: 100%;
+    /* 移除 height: 100%; 避免与 flex: 1 冲突,导致高度无法缩小 */
 }
 
 #heatmap {
     width: 100%;
-    height: 100%;
+    /* 移除 height: 100%; Plotly 会通过 JS 动态设置准确的高度 */
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
 }
 
 .range-slider-container {
     margin: 6px 0;
     position: relative;
+    padding: 6px 0; /* 为滑块上下溢出留出空间 */
 }
 
 .range-slider {
     position: relative;
     height: 4px;
-    background: #e9ecef;
+    background: #ffffff;
     border-radius: 2px;
 }
 
 .range-slider-track {
 position: absolute;
-height: 100%;
+height: 4px;
 background: #6666FF;
 border-radius: 2px;
+top: 6px; /* 与滑槽对齐 */
+left: 0;
+pointer-events: none; /* 不阻挡滑块交互 */
 }
 
 .range-slider input[type="range"] {
@@ -260,6 +554,7 @@ border-radius: 2px;
     -webkit-appearance: none;
     appearance: none;
     pointer-events: none;
+    top: 0; /* 对齐到滑槽 */
 }
 
 .range-slider input[type="range"]::-webkit-slider-thumb {
@@ -406,18 +701,6 @@ white-space: nowrap;
 text-align: center; /* 添加这行确保文本居中 */
 }
 
-.stats-grid .stat-item {
-background: white;
-color: #333;
-padding: 10px;
-border-radius: 4px;
-text-align: center;
-font-size: 11px;
-border: 1px solid #e9ecef;
-box-shadow: 0 1px 2px rgba(0,0,0,0.05);
-}
-
-
 @keyframes spin {
     0% { transform: rotate(0deg); }
     100% { transform: rotate(360deg); }
@@ -522,22 +805,47 @@ box-shadow: 0 1px 2px rgba(0,0,0,0.05);
 }
 
 .stats-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
     margin-top: 12px;
 }
 
+.stats-grid .stat-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 10px;
+    background: white;
+    border: 1px solid #e9ecef;
+    border-radius: 4px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+    font-size: 12px;
+}
 
-.stat-item .value {
-    font-size: 1.2rem;
-    font-weight: 600;
-    margin-bottom: 2px;
+.stat-item .icon {
+    flex-shrink: 0;
+    width: 16px;
+    height: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    color: #666;
 }
 
 .stat-item .label {
-    font-size: 0.75rem;
-    opacity: 0.9;
+    flex: 1;
+    font-size: 12px;
+    color: #495057;
+    font-weight: 500;
+}
+
+.stat-item .value {
+    flex-shrink: 0;
+    font-size: 13px;
+    font-weight: 600;
+    color: #333;
 }
 
 .topk-btn {
@@ -556,6 +864,35 @@ box-shadow: 0 1px 2px rgba(0,0,0,0.05);
     color: #495057;
 }
 
+/* 相似度范围输入框样式 */
+.similarity-input {
+    height: 24px;
+    padding: 0 6px;
+    border: 1px solid #ced4da;
+    border-radius: 3px;
+    font-size: 12px;
+    text-align: center;
+    transition: border-color 0.2s ease;
+    background: white;
+}
+
+.similarity-input:focus {
+    outline: none;
+    border-color: #6666FF;
+    box-shadow: 0 0 0 2px rgba(102, 102, 255, 0.1);
+}
+
+/* 隐藏number input的spinner按钮 */
+.similarity-input::-webkit-inner-spin-button,
+.similarity-input::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
+.similarity-input[type=number] {
+    -moz-appearance: textfield;
+}
+
 .topk-btn:hover {
 background: #f8f9fa;
 border-color: #6666FF;
@@ -572,20 +909,83 @@ color: #6666FF;
     background: #f8f9fa;
 }
 
+/* 响应式设计 */
 @media (max-width: 1200px) {
-    .main-layout {
-        grid-template-columns: 1fr;
-        grid-template-rows: auto 1fr;
+    .left-sidebar.open,
+    .right-sidebar.open {
+        width: 280px;
     }
 
-    .sidebar {
-        flex-direction: row;
-        overflow-x: auto;
-        gap: 8px;
-    }
-
-    .control-panel {
+    .sidebar-content-top,
+    .sidebar-content-bottom {
         min-width: 280px;
+    }
+
+    .icon-btn {
+        width: 32px;
+        height: 32px;
+        font-size: 16px;
+    }
+
+    .left-icon-bar,
+    .right-icon-bar {
+        width: 40px;
+    }
+}
+
+@media (max-width: 768px) {
+    /* 移动端调整父容器margin */
+    #pageContent:has(.test-container) {
+        margin: -1rem; /* 移动端padding通常更小 */
+        width: calc(100% + 2rem);
+    }
+
+    .test-container {
+        flex-direction: column;
+        height: calc(100vh - 60px); /* 确保移动端也正确减去导航栏高度 */
+    }
+
+    .left-section,
+    .right-section {
+        width: 100%;
+    }
+
+    .left-sidebar.open,
+    .right-sidebar.open {
+        width: 100%;
+        max-width: 100%;
+        position: fixed;
+        top: 60px;
+        bottom: 0;
+        z-index: 1000;
+        background: white;
+    }
+
+    .left-sidebar {
+        left: 48px;
+    }
+
+    .right-sidebar {
+        right: 48px;
+    }
+
+    .main-content {
+        order: -1;
+    }
+
+    .heatmap-main {
+        margin: 10px;
+    }
+
+    .icon-btn {
+        width: 30px;
+        height: 30px;
+        font-size: 14px;
+    }
+
+    .left-icon-bar,
+    .right-icon-bar {
+        width: 36px;
     }
 }
 .export-control {
@@ -828,8 +1228,8 @@ line-height: 1.4;
 }
 
 /* 边框颜色状态 */
-.matrix-list-item.border-primary {
-    border-left-color: #28a745 !important; /* 绿色 - 主数据源/被减数 */
+.matrix-list-item.border-primary2 {
+    border-left-color: #28a745; /* 绿色 - 主数据源/被减数 */
 }
 
 .matrix-list-item.border-subtract {
@@ -988,6 +1388,64 @@ line-height: 1.4;
 .matrix-control-btn:disabled {
     opacity: 0.3;
     cursor: not-allowed;
+}
+
+/* Plotly 热力图悬停提示框透明度 */
+.js-plotly-plot .hoverlayer .hovertext {
+    background: rgba(255, 255, 255, 0.5) !important;
+    backdrop-filter: blur(4px);
+}
+
+.js-plotly-plot .hoverlayer .hovertext path {
+    fill: rgba(255, 255, 255, 0.5) !important;
+    /*stroke: #6666FF !important;*/
+}
+
+/* 面板标题栏样式 */
+.panel-title-wrapper {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+    padding-bottom: 10px;
+    border-bottom: 2px solid #6666FF;
+}
+
+.panel-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: #404040;
+    margin: 0;
+}
+
+/* 标题行图标按钮样式 */
+.title-icon-btn {
+    width: 28px;
+    height: 28px;
+    min-width: 28px;
+    padding: 0;
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+    background: white;
+    color: #6c757d;
+    font-size: 16px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.title-icon-btn:hover {
+    background: #6666FF;
+    border-color: #6666FF;
+    color: white;
+    transform: scale(1.05);
+}
+
+.title-icon-btn:active {
+    transform: scale(0.95);
 }
 
 

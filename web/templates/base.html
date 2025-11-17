@@ -36,10 +36,13 @@
                 </a>
             </div>
 
-            <!-- 用户菜单 -->
-            <div class="navbar-nav">
+            <!-- GitHub链接和用户菜单 -->
+            <div class="navbar-nav d-flex flex-row align-items-center">
+                <a class="nav-link github-link me-3" href="https://github.com/RwandanMtGorilla/Kumi" target="_blank" title="GitHub">
+                    <i class="bi bi-github fs-5"></i>
+                </a>
                 <div class="nav-item dropdown">
-                    <a class="nav-link dropdown-toggle text-white" href="#" role="button" data-bs-toggle="dropdown">
+                    <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
                         <i class="bi bi-person-circle"></i> {{ user.username if user else 'Guest' }}
                     </a>
                     <ul class="dropdown-menu">

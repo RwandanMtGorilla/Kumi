@@ -75,8 +75,7 @@ class SimilarityCalculator:
 
             # 检查向量维度是否匹配
             if v1.shape != v2.shape:
-                print(f"❌ 向量维度不匹配: {v1.shape} vs {v2.shape}")
-                return 0.0
+                raise ValueError(f"向量维度不匹配: {v1.shape} vs {v2.shape}")
 
             dot_product = np.dot(v1, v2)
             norm_v1 = np.linalg.norm(v1)
@@ -92,9 +91,12 @@ class SimilarityCalculator:
 
             return float(similarity)
 
+        except ValueError:
+            # 重新抛出维度不匹配等值错误
+            raise
         except Exception as e:
             print(f"❌ 计算相似度失败: {e}")
-            return 0.0
+            raise ValueError(f"计算相似度失败: {str(e)}")
 
     def calculate_similarity_matrix(self, x_collection: str, y_collection: str,
                                     x_max_items: int = 100, y_max_items: int = 100) -> Dict[str, Any]:
@@ -136,6 +138,17 @@ class SimilarityCalculator:
                     y_vectors.append(item['embedding'])
                 else:
                     raise ValueError("Y数据中缺少向量字段")
+
+            # 检查向量维度是否一致
+            if x_vectors and y_vectors:
+                x_dim = len(x_vectors[0])
+                y_dim = len(y_vectors[0])
+                if x_dim != y_dim:
+                    raise ValueError(
+                        f"向量维度不匹配: {x_collection} 的向量维度为 {x_dim}, "
+                        f"{y_collection} 的向量维度为 {y_dim}。"
+                        f"无法计算不同维度向量之间的相似度。"
+                    )
 
             # 计算相似度矩阵
             print("🔄 计算相似度矩阵...")

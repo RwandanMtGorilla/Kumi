@@ -4,168 +4,47 @@
 
 {% block head %}
 <!-- 引入知识库测试页面的样式 -->
-<link rel="stylesheet" href="/static/css/knowledge/test.css">
+<link rel="stylesheet" href="/static/css/knowledge/test.css?v=2.3">
 <link href="/static/css/bootstrap-icons.css" rel="stylesheet">
 {% endblock %}
 
 {% block content %}
 
 <div class="test-container">
-    <div class="main-layout">
-        <!-- 左侧控制面板 -->
-        <div class="sidebar">
-            <!-- 数据源配置部分 -->
-<div class="control-panel">
-    <div class="control-section">
-        <div class="section-title">数据源配置</div>
-
-        <div class="control-group">
-            <label>横坐标 Collection</label>
-            <div id="xCollectionContainer" class="collection-container">
-                <div class="collection-select-row">
-                    <select class="x-collection-select">
-                        <option value="">请选择...</option>
-                    </select>
-                    <button type="button" class="btn-add-collection" onclick="addCollectionSelect('x')" title="添加">+</button>
-                </div>
+    <!-- 左侧区域 -->
+    <div class="left-section">
+        <!-- 左侧图标栏 -->
+        <div class="left-icon-bar">
+            <div class="icon-group-top">
+                <button class="icon-btn active" data-side="left" data-position="top" data-panel="dataSource" title="数据源配置">
+                    <i class="bi bi-database"></i>
+                </button>
+                <button class="icon-btn" data-side="left" data-position="top" data-panel="operations" title="结果操作">
+                    <i class="bi bi-file-earmark-arrow-down"></i>
+                </button>
             </div>
-            <div class="required-error" id="xCollectionError">请选择至少一个横坐标 Collection</div>
-        </div>
-
-        <div class="control-group">
-            <label for="xMaxItems">横坐标最大项目数</label>
-            <input type="number" id="xMaxItems" min="10" max="500" value="30">
-        </div>
-
-        <div class="control-group">
-            <label>纵坐标 Collection</label>
-            <div id="yCollectionContainer" class="collection-container">
-                <div class="collection-select-row">
-                    <select class="y-collection-select">
-                        <option value="">请选择...</option>
-                    </select>
-                    <button type="button" class="btn-add-collection" onclick="addCollectionSelect('y')" title="添加">+</button>
-                </div>
+            <div class="icon-group-bottom">
+                <button class="icon-btn active" data-side="left" data-position="bottom" data-panel="chartControl" title="图表选择与控制">
+                    <i class="bi bi-grid-3x3"></i>
+                </button>
             </div>
-            <div class="required-error" id="yCollectionError">请选择至少一个纵坐标 Collection</div>
         </div>
 
-        <div class="control-group">
-            <label for="yMaxItems">纵坐标最大项目数</label>
-            <input type="number" id="yMaxItems" min="10" max="500" value="30">
+        <!-- 左侧内容面板 -->
+        <div class="left-sidebar open" id="leftSidebar">
+            <div class="resize-handle" data-side="left"></div>
+            <div class="sidebar-content-top active" id="leftContentTop">
+                <!-- 左上区域动态内容 -->
+            </div>
+            <div class="vertical-resize-handle active" data-side="left"></div>
+            <div class="sidebar-content-bottom active" id="leftContentBottom">
+                <!-- 左下区域动态内容 -->
+            </div>
         </div>
-
-        <button class="btn btn-primary" onclick="calculateSimilarity()">计算相似度</button>
-        <button class="btn btn-secondary" onclick="triggerImportJSON()" style="margin-top: 6px;">导入数据</button>
-        <button class="btn btn-secondary" onclick="loadCollections()" style="margin-top: 6px;">刷新Collections</button>
-        <input type="file" id="importFileInput" accept=".json" style="display: none;" onchange="handleImportFile(event)">
     </div>
-</div>
 
-            <!-- 可视化控制 -->
-            <div class="control-panel">
-                <div class="control-section">
-                    <div class="section-title">可视化控制</div>
-                    <div class="control-section" id="matrixSelectorControl" style="display: none;">
-                        <div class="section-title">图表选择与控制</div>
-                        <div class="section-subtitle">提示：应用数据=显示该图数据；应用筛选器=使用筛选条件（支持多选）；独占模式=锁定编辑该图</div>
-
-                        <div class="matrix-list-container" id="matrixButtonTable">
-                            <!-- 动态生成的竖排图表列表 -->
-                        </div>
-                    </div>
-
-                    <div class="control-group">
-                        <label>相似度阈值范围</label>
-                        <div class="range-slider-container">
-                            <div class="range-slider">
-                                <div class="range-slider-track" id="similarityTrack"></div>
-                                <input type="range" id="minSimilaritySlider" min="0" max="1" step="0.01" value="0">
-                                <input type="range" id="maxSimilaritySlider" min="0" max="1" step="0.01" value="1">
-                            </div>
-                            <div class="range-values">
-                                <span id="minSimilarityValue">0.00</span>
-                                <span id="maxSimilarityValue">1.00</span>
-                            </div>
-                        </div>
-                        <div class="dual-input-group" style="margin-top: 6px;">
-                            <input type="number" id="minSimilarityInput" min="0" max="1" step="0.01" value="0" placeholder="最小值">
-                            <input type="number" id="maxSimilarityInput" min="0" max="1" step="0.01" value="1" placeholder="最大值">
-                        </div>
-                    </div>
-
-                    <!-- Top-K 控制 -->
-                    <div class="control-group topk-control">
-                        <label>Top-K 筛选</label>
-                        <div class="topk-slider-container">
-                            <div style="display: flex; align-items: center; gap: 6px;">
-                                <button class="topk-btn" id="topkDecBtn" onclick="adjustTopk(-1)">-</button>
-                                <input type="range" id="topkSlider" class="topk-slider" min="0" max="50" step="1" value="0" style="flex: 1;">
-                                <button class="topk-btn" id="topkIncBtn" onclick="adjustTopk(1)">+</button>
-                            </div>
-                            <div class="topk-info">
-                                <span>Top-K: <span id="topkValue">0</span></span>
-                                <span id="topkStatus">显示全部</span>
-                            </div>
-                        </div>
-                        <div class="topk-axis-selector">
-                            <button class="axis-btn active" id="xAxisBtn" onclick="setTopkAxis('x')">横轴Top-K</button>
-                            <button class="axis-btn" id="yAxisBtn" onclick="setTopkAxis('y')">纵轴Top-K</button>
-                        </div>
-                    </div>
-
-                    <div class="control-group" id="displayFieldControls" style="display: none;">
-                        <label for="xDisplayField">横坐标显示字段</label>
-                        <select id="xDisplayField">
-                            <option value="">请先计算相似度</option>
-                        </select>
-                    </div>
-
-                    <div class="control-group" id="yDisplayFieldControls" style="display: none;">
-                        <label for="yDisplayField">纵坐标显示字段</label>
-                        <select id="yDisplayField">
-                            <option value="">请先计算相似度</option>
-                        </select>
-                    </div>
-
-                    <div class="control-group">
-                        <label for="sortOrder">排序方式</label>
-                        <select id="sortOrder">
-                            <option value="none">原始顺序</option>
-                            <option value="desc">相似度降序</option>
-                            <option value="asc">相似度升序</option>
-                            <option value="x_asc">横坐标字段升序</option>
-                            <option value="x_desc">横坐标字段降序</option>
-                            <option value="y_asc">纵坐标字段升序</option>
-                            <option value="y_desc">纵坐标字段降序</option>
-                        </select>
-                    </div>
-                </div>
-
-                <!-- 统计信息 -->
-                <div class="control-section" id="statsSection" style="display: none;">
-                    <div class="section-title">统计信息</div>
-                    <div class="stats-grid" id="statsGrid"></div>
-                </div>
-                <!-- 结果操作 -->
-                <div class="control-section" id="operationsSection" style="display: none;">
-                    <div class="section-title">结果操作</div>
-                    <div class="export-control">
-                        <div class="control-group">
-                            <label for="exportMatrixSelect">选择要导出的图表</label>
-                            <select id="exportMatrixSelect" class="form-control">
-                                <option value="">请先计算相似度</option>
-                            </select>
-                        </div>
-                        <button class="btn btn-export" id="exportJsonBtn" onclick="exportToJSON()" style="margin-top: 6px;">
-                            导出JSON
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- 右侧热力图主区域 -->
+    <!-- 主内容区域(热力图) -->
+    <div class="main-content">
         <div class="heatmap-main">
             <div class="heatmap-controls">
                 <div class="colorscheme-selector">
@@ -187,13 +66,45 @@
             </div>
         </div>
     </div>
+
+    <!-- 右侧区域 -->
+    <div class="right-section">
+        <!-- 右侧图标栏 -->
+        <div class="right-icon-bar">
+            <div class="icon-group-top">
+                <button class="icon-btn" data-side="right" data-position="top" data-panel="statistics" title="统计信息">
+                    <i class="bi bi-bar-chart"></i>
+                </button>
+            </div>
+            <div class="icon-group-bottom">
+                <button class="icon-btn" data-side="right" data-position="bottom" data-panel="filters" title="筛选器控制">
+                    <i class="bi bi-funnel"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- 右侧内容面板 -->
+        <div class="right-sidebar" id="rightSidebar">
+            <div class="resize-handle" data-side="right"></div>
+            <div class="sidebar-content-top" id="rightContentTop">
+                <!-- 右上区域动态内容 -->
+            </div>
+            <div class="vertical-resize-handle" data-side="right"></div>
+            <div class="sidebar-content-bottom" id="rightContentBottom">
+                <!-- 右下区域动态内容 -->
+            </div>
+        </div>
+    </div>
 </div>
+
+<!-- 隐藏的文件输入 -->
+<input type="file" id="importFileInput" accept=".json" multiple style="display: none;" onchange="handleImportFile(event)">
 
 <!-- 引入 Plotly.js 和其他依赖库 -->
 <script src="/static/js/exceljs-4-3-0/exceljs.min.js"></script>
 <script src="/static/js/plotly-js-2-26-0/plotly.min.js"></script>
 
 <!-- 引入知识库测试页面的脚本 -->
-<script src="/static/js/knowledge/test.js?v=1.2"></script>
+<script src="/static/js/knowledge/test.js?v=2.7"></script>
 
 {% endblock %}

@@ -108,6 +108,24 @@ body {
     gap: 1rem; /* 使用gap代替margin */
 }
 
+/* GitHub链接样式 */
+.navbar .github-link {
+    color: var(--gray-600) !important;
+    text-decoration: none;
+    padding: 0.5rem;
+    border-radius: 0.375rem;
+    transition: all 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.navbar .github-link:hover {
+    background-color: var(--gray-100);
+    color: var(--primary-color) !important;
+    transform: scale(1.1);
+}
+
 /* 用户下拉菜单样式 */
 .navbar .dropdown-toggle {
     color: var(--gray-600) !important;
