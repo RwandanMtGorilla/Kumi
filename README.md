@@ -10,7 +10,45 @@
 2. 更自由化的知识库构建（清洗 切分），支持以xlsx，csv，json等类表格格式导入切分完成的数据 暴露api接口给平台调用
 3. 启动必要的插件接口（在网络层）
 
+## 使用方法
+<details id="使用方法">
+<summary><strong>👉 点击展开：使用方法</strong></summary>
 
+### 知识文件准备
+- 关于如何将pdf等各类格式处理为知识文件（表格文件）
+- 如果您的文件已经切分为表格文件形式 可以跳过本部分
+<details id="知识文件准备">
+<summary><strong>👉 点击展开：知识文件准备</strong></summary>
+
+0. 文本化(尚未集成) 文本类pdf docx 建议使用 [markitdown](https://github.com/microsoft/markitdown); 图pdf ppt等需要图OCR的 建议使用 [MinerU](https://github.com/opendatalab/MinerU) (高算力高质量) 或 [PaddleOCR](https://github.com/PaddlePaddle/PaddleOCR) (高算力高质量)
+1. 切分(脚本形式) 在 `scripts\md2qa` 新建 `input` 文件夹 将处理好的 `.md` 文件放入 执行 `step1_md2csv.py`.  这会切分你的`.md` 文件为`.csv`格式 并放在 `output` 文件夹中
+2. 问答对生成(脚本形式)(用于多图对比测试) 执行 `step2_chunk2qa.py`. 这会为你在 `output` 文件夹中的 `.csv` 文件生成问题(一行一个) 并放在 `QA` 文件夹中
+
+
+</details>
+
+### 知识库导入
+- 关于如何导入
+<details id="知识库导入">
+<summary><strong>👉 点击展开：知识库导入</strong></summary>
+
+知识库 > 知识库上传 > 上传文件 > 预览文件 > 配置参数 > 选择使用字段 > 开始处理 
+
+todo: 再完善一下 
+
+</details>
+
+### 知识库测试
+
+<details id="知识库测试">
+<summary><strong>👉 点击展开：知识库测试</strong></summary>
+
+
+todo: 再完善一下 
+
+</details>
+
+</details>
 
 ## 部署方法
 <details id="部署方法">
