@@ -16,136 +16,24 @@ const sidebarData = {
     dataSource: {
         title: '数据源配置',
         titleButton: '<button class="title-icon-btn" onclick="loadCollections()" title="刷新Collections"><i class="bi bi-arrow-clockwise"></i></button>',
-        content: `
-            <div class="control-group">
-                <label>横坐标 Collection</label>
-                <div id="xCollectionContainer" class="collection-container">
-                    <div class="collection-select-row">
-                        <select class="x-collection-select">
-                            <option value="">请选择...</option>
-                        </select>
-                        <button type="button" class="btn-add-collection" onclick="addCollectionSelect('x')" title="添加">+</button>
-                    </div>
-                </div>
-                <div class="required-error" id="xCollectionError">请选择至少一个横坐标 Collection</div>
-            </div>
-
-            <div class="control-group">
-                <label for="xMaxItems">横坐标最大项目数</label>
-                <input type="number" id="xMaxItems" min="10" max="500" value="30">
-            </div>
-
-            <div class="control-group">
-                <label>纵坐标 Collection</label>
-                <div id="yCollectionContainer" class="collection-container">
-                    <div class="collection-select-row">
-                        <select class="y-collection-select">
-                            <option value="">请选择...</option>
-                        </select>
-                        <button type="button" class="btn-add-collection" onclick="addCollectionSelect('y')" title="添加">+</button>
-                    </div>
-                </div>
-                <div class="required-error" id="yCollectionError">请选择至少一个纵坐标 Collection</div>
-            </div>
-
-            <div class="control-group">
-                <label for="yMaxItems">纵坐标最大项目数</label>
-                <input type="number" id="yMaxItems" min="10" max="500" value="30">
-            </div>
-
-            <button class="btn btn-primary" onclick="calculateSimilarity()">计算相似度</button>
-        `
+        templateId: 'tpl-dataSource'
     },
     operations: {
         title: '结果操作',
-        content: `
-            <div class="export-control">
-                <div class="control-group">
-                    <label for="exportMatrixSelect">选择要导出的图表</label>
-                    <select id="exportMatrixSelect" class="form-control">
-                        <option value="">请先计算相似度</option>
-                    </select>
-                </div>
-                <button class="btn btn-export" id="exportJsonBtn" onclick="exportToJSON()" style="margin-top: 6px;">
-                    导出JSON
-                </button>
-            </div>
-        `
+        templateId: 'tpl-operations'
     },
     chartControl: {
         title: '图表选择与控制',
         titleButton: '<button class="title-icon-btn" onclick="triggerImportJSON()" title="导入数据"><i class="bi bi-file-earmark-arrow-up"></i></button>',
-        content: `
-            <div class="control-section" id="matrixSelectorControl" style="display: none;">
-                <div class="section-subtitle">提示:应用数据=显示该图数据;应用筛选器=使用筛选条件(支持多选);独占模式=锁定编辑该图</div>
-
-                <div class="matrix-list-container" id="matrixButtonTable">
-                    <!-- 动态生成的竖排图表列表 -->
-                </div>
-            </div>
-        `
+        templateId: 'tpl-chartControl'
     },
     statistics: {
         title: '统计信息',
-        content: `
-            <div class="stats-grid" id="statsGrid"></div>
-        `
+        templateId: 'tpl-statistics'
     },
     filters: {
         title: '筛选器控制',
-        content: `
-            <div class="control-group" id="displayFieldControls" style="display: none;">
-                <label for="xDisplayField">横坐标显示字段</label>
-                <select id="xDisplayField">
-                    <option value="">请先计算相似度</option>
-                </select>
-            </div>
-
-            <div class="control-group" id="yDisplayFieldControls" style="display: none;">
-                <label for="yDisplayField">纵坐标显示字段</label>
-                <select id="yDisplayField">
-                    <option value="">请先计算相似度</option>
-                </select>
-            </div>
-
-            <div class="control-group">
-                <label>相似度阈值范围</label>
-                <div class="range-slider-container">
-                    <div class="range-slider">
-                        <div class="range-slider-track" id="similarityTrack"></div>
-                        <input type="range" id="minSimilaritySlider" min="0" max="1" step="0.01" value="0">
-                        <input type="range" id="maxSimilaritySlider" min="0" max="1" step="0.01" value="1">
-                    </div>
-                </div>
-                <div style="margin-top: 12px; display: flex; gap: 6px; align-items: center;">
-                    <button class="topk-btn" id="minSimilarityDecBtn" onclick="adjustMinSimilarity(-0.01)">-</button>
-                    <input type="number" class="similarity-input" id="minSimilarityInput" min="0" max="1" step="0.01" value="0" placeholder="最小值" style="flex: 1;">
-                    <button class="topk-btn" id="minSimilarityIncBtn" onclick="adjustMinSimilarity(0.01)">+</button>
-                    <button class="topk-btn" id="maxSimilarityDecBtn" onclick="adjustMaxSimilarity(-0.01)">-</button>
-                    <input type="number" class="similarity-input" id="maxSimilarityInput" min="0" max="1" step="0.01" value="1" placeholder="最大值" style="flex: 1;">
-                    <button class="topk-btn" id="maxSimilarityIncBtn" onclick="adjustMaxSimilarity(0.01)">+</button>
-                </div>
-            </div>
-
-            <div class="control-group topk-control">
-                <label>Top-K 筛选</label>
-                <div class="topk-slider-container">
-                    <div style="display: flex; align-items: center; gap: 6px;">
-                        <button class="topk-btn" id="topkDecBtn" onclick="adjustTopk(-1)">-</button>
-                        <input type="range" id="topkSlider" class="topk-slider" min="0" max="50" step="1" value="0" style="flex: 1;">
-                        <button class="topk-btn" id="topkIncBtn" onclick="adjustTopk(1)">+</button>
-                    </div>
-                    <div class="topk-info">
-                        <span>Top-K: <span id="topkValue">0</span></span>
-                        <span id="topkStatus">显示全部</span>
-                    </div>
-                </div>
-                <div class="topk-axis-selector">
-                    <button class="axis-btn active" id="xAxisBtn" onclick="setTopkAxis('x')">横轴Top-K</button>
-                    <button class="axis-btn" id="yAxisBtn" onclick="setTopkAxis('y')">纵轴Top-K</button>
-                </div>
-            </div>
-        `
+        templateId: 'tpl-filters'
     }
 };
 
@@ -233,7 +121,20 @@ function preloadAllPanels() {
                </div>`
             : `<h3 style="font-size: 14px; font-weight: 600; margin-bottom: 15px; color: #404040; padding-bottom: 10px; border-bottom: 2px solid #6666FF;">${data.title}</h3>`;
 
-        panelDiv.innerHTML = titleHTML + data.content;
+        // 获取模板内容
+        let contentHTML = '';
+        if (data.templateId) {
+            const tpl = document.getElementById(data.templateId);
+            if (tpl) {
+                contentHTML = tpl.innerHTML;
+            } else {
+                console.error(`Template #${data.templateId} not found for panel ${panelName}`);
+            }
+        } else if (data.content) {
+            contentHTML = data.content;
+        }
+
+        panelDiv.innerHTML = titleHTML + contentHTML;
 
         globalPanelContainer.appendChild(panelDiv);
     });
@@ -289,7 +190,7 @@ function rebindEventHandlers(panel) {
     console.log(`[事件绑定] 初始化面板: ${panel}`);
 
     // 根据不同的面板绑定相应的事件处理器
-    switch(panel) {
+    switch (panel) {
         case 'filters':
             // 初始化筛选器控件
             if (typeof initRangeSlider === 'function') {
@@ -315,7 +216,7 @@ function rebindEventHandlers(panel) {
             const yContainer = document.getElementById('yCollectionContainer');
 
             if (xContainer) {
-                xContainer.addEventListener('change', function(e) {
+                xContainer.addEventListener('change', function (e) {
                     if (e.target.classList.contains('x-collection-select')) {
                         const errorEl = document.getElementById('xCollectionError');
                         if (errorEl) errorEl.style.display = 'none';
@@ -324,7 +225,7 @@ function rebindEventHandlers(panel) {
             }
 
             if (yContainer) {
-                yContainer.addEventListener('change', function(e) {
+                yContainer.addEventListener('change', function (e) {
                     if (e.target.classList.contains('y-collection-select')) {
                         const errorEl = document.getElementById('yCollectionError');
                         if (errorEl) errorEl.style.display = 'none';
@@ -425,7 +326,7 @@ function initializeSidebar() {
     const buttons = document.querySelectorAll('.icon-btn');
 
     buttons.forEach(button => {
-        button.addEventListener('mousedown', function(e) {
+        button.addEventListener('mousedown', function (e) {
             dragState.draggedButton = this;
             dragState.startX = e.clientX;
             dragState.startY = e.clientY;
@@ -433,7 +334,7 @@ function initializeSidebar() {
             e.preventDefault();
         });
 
-        button.addEventListener('click', function() {
+        button.addEventListener('click', function () {
             if (dragState.hasMoved) {
                 return;
             }
@@ -460,7 +361,7 @@ function initializeSidebar() {
         });
     });
 
-    document.addEventListener('mousemove', function(e) {
+    document.addEventListener('mousemove', function (e) {
         if (!dragState.draggedButton) return;
 
         const deltaX = Math.abs(e.clientX - dragState.startX);
@@ -476,7 +377,7 @@ function initializeSidebar() {
         }
     });
 
-    document.addEventListener('mouseup', function(e) {
+    document.addEventListener('mouseup', function (e) {
         if (dragState.isDragging) {
             finishDragging(e);
         } else {
@@ -503,7 +404,7 @@ function initializeResizeHandles() {
         let resizeTimer = null;
         const side = handle.dataset.side;
 
-        handle.addEventListener('mousedown', function(e) {
+        handle.addEventListener('mousedown', function (e) {
             sidebar = document.getElementById(`${side}Sidebar`);
             if (!sidebar.classList.contains('open')) return;
 
@@ -515,7 +416,7 @@ function initializeResizeHandles() {
             e.preventDefault();
         });
 
-        document.addEventListener('mousemove', function(e) {
+        document.addEventListener('mousemove', function (e) {
             if (!isResizing) return;
 
             let newWidth;
@@ -538,7 +439,7 @@ function initializeResizeHandles() {
             }, 50);
         });
 
-        document.addEventListener('mouseup', function() {
+        document.addEventListener('mouseup', function () {
             if (isResizing) {
                 isResizing = false;
                 handle.classList.remove('dragging');
@@ -569,7 +470,7 @@ function initializeResizeHandles() {
         let startHeight = 0;
         const side = handle.dataset.side;
 
-        handle.addEventListener('mousedown', function(e) {
+        handle.addEventListener('mousedown', function (e) {
             if (!handle.classList.contains('active')) return;
 
             contentTop = document.getElementById(`${side}ContentTop`);
@@ -582,7 +483,7 @@ function initializeResizeHandles() {
             e.preventDefault();
         });
 
-        document.addEventListener('mousemove', function(e) {
+        document.addEventListener('mousemove', function (e) {
             if (!isResizing) return;
 
             const deltaY = e.clientY - startY;
@@ -599,7 +500,7 @@ function initializeResizeHandles() {
             contentTop.style.height = clampedHeight + 'px';
         });
 
-        document.addEventListener('mouseup', function() {
+        document.addEventListener('mouseup', function () {
             if (isResizing) {
                 isResizing = false;
                 handle.classList.remove('dragging');
@@ -722,7 +623,7 @@ function getDropTarget(e) {
                 { element: bottomGroup, position: 'bottom' }
             ];
 
-            groups.forEach(({ element: group}) => {
+            groups.forEach(({ element: group }) => {
                 if (!group) return;
 
                 const groupRect = group.getBoundingClientRect();
@@ -922,7 +823,7 @@ function restoreButtonLayout() {
 }
 
 // 页面加载时初始化侧边栏
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', function () {
     restoreButtonLayout(); // 先恢复布局
     initializeSidebar();
 });
@@ -1347,7 +1248,7 @@ function addCollectionSelect(axis) {
     removeBtn.className = 'btn-remove-collection';
     removeBtn.textContent = '-';
     removeBtn.title = '删除';
-    removeBtn.onclick = function() {
+    removeBtn.onclick = function () {
         removeCollectionSelect(this);
     };
 
@@ -1771,9 +1672,9 @@ function setTopkAxis(axis) {
         updateHeatmap();
         // 更新统计信息
         if (globalUIState.dataSource.subtractIndex !== null) {
-            showDifferenceStatistics();
+            showDifferenceStatistics(false);
         } else {
-            showStatistics();
+            showStatistics(false);
         }
     }
 }
@@ -2136,7 +2037,7 @@ function updateHeatmap() {
             }
         };
     }
-    
+
     // =====
     // 新架构核心逻辑 - 使用公共函数计算最终遮罩
     // =====
@@ -2161,7 +2062,7 @@ function updateHeatmap() {
 
     let displayXLabels = [...currentXLabels];
     let displayYLabels = [...currentYLabels];
-// 更新热力图数据，但保持当前的缩放状态
+    // 更新热力图数据，但保持当前的缩放状态
     updateHeatmapData(displayMatrix, displayXLabels, displayYLabels, currentLayout);
 
     // 更新统计信息中的当前显示对比数
@@ -2215,7 +2116,7 @@ function updateHeatmapData(matrix, xLabels, yLabels, preserveLayout = null) {
 
     if (preserveLayout) {
         document.getElementById('heatmap');
-// 使用 Plotly.restyle 只更新数据，不影响布局
+        // 使用 Plotly.restyle 只更新数据，不影响布局
         Plotly.restyle('heatmap', {
             z: [matrix],
             x: [xLabels],
@@ -2334,9 +2235,9 @@ function createHeatmap(matrix = filteredMatrix, xLabels = currentXLabels, yLabel
         hoverongaps: false,
         // 修改 hovertemplate 使用 customdata 中的换行文本
         hovertemplate: '<b>Y: %{customdata.yText}</b><br>' +
-                      '<b>X: %{customdata.xText}</b><br>' +
-                      '<b>相似度: %{z:.4f}</b>' +
-                      '<extra></extra>',
+            '<b>X: %{customdata.xText}</b><br>' +
+            '<b>相似度: %{z:.4f}</b>' +
+            '<extra></extra>',
         colorbar: {
             title: isInDifferenceMode() ? '差值' : '相似度',
             titleside: 'right',
@@ -2592,7 +2493,7 @@ function calculateDifferenceModeStatistics(groundTruthMask, currentMask) {
 }
 
 // 显示统计信息
-function showStatistics() {
+function showStatistics(activatePanel = true) {
     const statsGrid = document.getElementById('statsGrid');
 
     if (!statsGrid) {
@@ -2646,36 +2547,38 @@ function showStatistics() {
 
     statsGrid.innerHTML = statsHTML;
 
-    // 激活统计信息按钮（使用新架构）
-    const statisticsBtn = document.querySelector('[data-side="right"][data-position="top"][data-panel="statistics"]');
-    if (statisticsBtn && !statisticsBtn.classList.contains('active')) {
-        // 取消同位置其他按钮的激活状态
-        if (activeButtons.right.top && activeButtons.right.top !== statisticsBtn) {
-            activeButtons.right.top.classList.remove('active');
+    if (activatePanel) {
+        // 激活统计信息按钮（使用新架构）
+        const statisticsBtn = document.querySelector('[data-side="right"][data-position="top"][data-panel="statistics"]');
+        if (statisticsBtn && !statisticsBtn.classList.contains('active')) {
+            // 取消同位置其他按钮的激活状态
+            if (activeButtons.right.top && activeButtons.right.top !== statisticsBtn) {
+                activeButtons.right.top.classList.remove('active');
+            }
+            statisticsBtn.classList.add('active');
+            activeButtons.right.top = statisticsBtn;
+
+            // 关键：调用 updateSidebarContent 来移动面板
+            updateSidebarContent('right', 'top', 'statistics');
         }
-        statisticsBtn.classList.add('active');
-        activeButtons.right.top = statisticsBtn;
 
-        // 关键：调用 updateSidebarContent 来移动面板
-        updateSidebarContent('right', 'top', 'statistics');
-    }
+        // 激活筛选器控制按钮（使用新架构）
+        const filtersBtn = document.querySelector('[data-side="right"][data-position="bottom"][data-panel="filters"]');
+        if (filtersBtn && !filtersBtn.classList.contains('active')) {
+            // 取消同位置其他按钮的激活状态
+            if (activeButtons.right.bottom && activeButtons.right.bottom !== filtersBtn) {
+                activeButtons.right.bottom.classList.remove('active');
+            }
+            filtersBtn.classList.add('active');
+            activeButtons.right.bottom = filtersBtn;
 
-    // 激活筛选器控制按钮（使用新架构）
-    const filtersBtn = document.querySelector('[data-side="right"][data-position="bottom"][data-panel="filters"]');
-    if (filtersBtn && !filtersBtn.classList.contains('active')) {
-        // 取消同位置其他按钮的激活状态
-        if (activeButtons.right.bottom && activeButtons.right.bottom !== filtersBtn) {
-            activeButtons.right.bottom.classList.remove('active');
+            // 关键：调用 updateSidebarContent 来移动面板
+            updateSidebarContent('right', 'bottom', 'filters');
         }
-        filtersBtn.classList.add('active');
-        activeButtons.right.bottom = filtersBtn;
 
-        // 关键：调用 updateSidebarContent 来移动面板
-        updateSidebarContent('right', 'bottom', 'filters');
+        // 更新右侧边栏状态（打开侧边栏）
+        updateSidebarState('right');
     }
-
-    // 更新右侧边栏状态（打开侧边栏）
-    updateSidebarState('right');
 }
 
 // =====
@@ -2704,7 +2607,7 @@ function calculateTrackPosition(minValue, maxValue, minSlider) {
     const percent2 = (maxValue - sliderMin) / (sliderMax - sliderMin);
 
     // 计算thumb中心点的实际像素位置
-    const availableWidth = sliderWidth - thumbWidth*2;
+    const availableWidth = sliderWidth - thumbWidth * 2;
     const leftPos = thumbRadius + availableWidth * percent1;
     const rightPos = thumbRadius + availableWidth * percent2;
 
@@ -2775,30 +2678,30 @@ function initRangeSlider() {
                 clearTimeout(statsUpdateTimer);
                 statsUpdateTimer = setTimeout(() => {
                     if (globalUIState.dataSource.subtractIndex !== null) {
-                        showDifferenceStatistics();
+                        showDifferenceStatistics(false);
                     } else {
-                        showStatistics();
+                        showStatistics(false);
                     }
                 }, 50);
             }
         }, DEBOUNCE_DELAY);
     }
 
-    minSlider.addEventListener('input', function() {
+    minSlider.addEventListener('input', function () {
         if (parseFloat(this.value) > parseFloat(maxSlider.value)) {
             this.value = maxSlider.value;
         }
         updateTrack();
     });
 
-    maxSlider.addEventListener('input', function() {
+    maxSlider.addEventListener('input', function () {
         if (parseFloat(this.value) < parseFloat(minSlider.value)) {
             this.value = minSlider.value;
         }
         updateTrack();
     });
 
-    minInput.addEventListener('change', function() {
+    minInput.addEventListener('change', function () {
         // 修复：使用 ?? 而非 ||，避免将 0 当作 falsy 值
         const inputValue = parseFloat(this.value);
         const defaultValue = parseFloat(minSlider.min);
@@ -2806,7 +2709,7 @@ function initRangeSlider() {
         updateTrack();
     });
 
-    maxInput.addEventListener('change', function() {
+    maxInput.addEventListener('change', function () {
         // 修复：使用 ?? 而非 ||，避免将 0 当作 falsy 值
         const inputValue = parseFloat(this.value);
         const defaultValue = parseFloat(maxSlider.max);
@@ -2877,7 +2780,7 @@ function initTopkSlider() {
         updateTopkButtons();
     }
     // 添加input事件监听器，实现拖动时实时更新热力图(使用防抖优化)
-    topkSlider.addEventListener('input', function() {
+    topkSlider.addEventListener('input', function () {
         updateTopkDisplayInternal();
 
         // 防抖: 延迟100ms更新热力图和统计信息
@@ -2915,7 +2818,7 @@ function initColorSchemeSelector() {
     const colorBtns = document.querySelectorAll('.colorscheme-btn');
 
     colorBtns.forEach(btn => {
-        btn.addEventListener('click', function() {
+        btn.addEventListener('click', function () {
             // 移除所有active类
             colorBtns.forEach(b => b.classList.remove('active'));
             // 添加当前active类
@@ -2944,7 +2847,7 @@ function initDisplayFieldSelectors() {
     }
 
     // X轴显示字段选择器
-    xDisplayFieldEl.addEventListener('change', function() {
+    xDisplayFieldEl.addEventListener('change', function () {
         const xField = this.value;
         console.log(`[显示字段] X轴字段切换为: ${xField}`);
 
@@ -2964,12 +2867,12 @@ function initDisplayFieldSelectors() {
                 globalUIState.dataSource.currentXData,
                 xField
             );
-            updateHeatmapFromGlobalState();
+            updateHeatmapFromGlobalState(false);
         }
     });
 
     // Y轴显示字段选择器
-    yDisplayFieldEl.addEventListener('change', function() {
+    yDisplayFieldEl.addEventListener('change', function () {
         const yField = this.value;
         console.log(`[显示字段] Y轴字段切换为: ${yField}`);
 
@@ -2989,7 +2892,7 @@ function initDisplayFieldSelectors() {
                 globalUIState.dataSource.currentYData,
                 yField
             );
-            updateHeatmapFromGlobalState();
+            updateHeatmapFromGlobalState(false);
         }
     });
 }
@@ -3288,8 +3191,8 @@ function validateImportedData(data) {
     const requiredFields = [
         'xCollection', 'yCollection', 'matrix',
         'xData', 'yData',
-        'xAvailableFields', 'yAvailableFields',
-        'stats'
+        'xAvailableFields', 'yAvailableFields'
+        // 注意: stats字段已改为实时计算,不再作为必需字段
     ];
 
     for (const field of requiredFields) {
@@ -3397,7 +3300,7 @@ function importDataToResults(importedData) {
 // =====
 
 // 监听窗口大小变化，重新调整图表大小
-window.addEventListener('resize', function() {
+window.addEventListener('resize', function () {
     if (document.getElementById('heatmap').innerHTML && filteredMatrix) {
         // 延迟执行以确保容器尺寸已更新
         setTimeout(() => {
@@ -3909,7 +3812,7 @@ function updateDisplayFieldSelectorsFromGlobalState() {
 }
 
 // 新增：显示差值统计信息
-function showDifferenceStatistics() {
+function showDifferenceStatistics(activatePanel = true) {
     const statsGrid = document.getElementById('statsGrid');
 
     if (!statsGrid) {
@@ -4010,36 +3913,38 @@ function showDifferenceStatistics() {
 
     statsGrid.innerHTML = statsHTML;
 
-    // 激活统计信息按钮（使用新架构）
-    const statisticsBtn = document.querySelector('[data-side="right"][data-position="top"][data-panel="statistics"]');
-    if (statisticsBtn && !statisticsBtn.classList.contains('active')) {
-        // 取消同位置其他按钮的激活状态
-        if (activeButtons.right.top && activeButtons.right.top !== statisticsBtn) {
-            activeButtons.right.top.classList.remove('active');
+    if (activatePanel) {
+        // 激活统计信息按钮（使用新架构）
+        const statisticsBtn = document.querySelector('[data-side="right"][data-position="top"][data-panel="statistics"]');
+        if (statisticsBtn && !statisticsBtn.classList.contains('active')) {
+            // 取消同位置其他按钮的激活状态
+            if (activeButtons.right.top && activeButtons.right.top !== statisticsBtn) {
+                activeButtons.right.top.classList.remove('active');
+            }
+            statisticsBtn.classList.add('active');
+            activeButtons.right.top = statisticsBtn;
+
+            // 关键：调用 updateSidebarContent 来移动面板
+            updateSidebarContent('right', 'top', 'statistics');
         }
-        statisticsBtn.classList.add('active');
-        activeButtons.right.top = statisticsBtn;
 
-        // 关键：调用 updateSidebarContent 来移动面板
-        updateSidebarContent('right', 'top', 'statistics');
-    }
+        // 激活筛选器控制按钮（使用新架构）
+        const filtersBtn = document.querySelector('[data-side="right"][data-position="bottom"][data-panel="filters"]');
+        if (filtersBtn && !filtersBtn.classList.contains('active')) {
+            // 取消同位置其他按钮的激活状态
+            if (activeButtons.right.bottom && activeButtons.right.bottom !== filtersBtn) {
+                activeButtons.right.bottom.classList.remove('active');
+            }
+            filtersBtn.classList.add('active');
+            activeButtons.right.bottom = filtersBtn;
 
-    // 激活筛选器控制按钮（使用新架构）
-    const filtersBtn = document.querySelector('[data-side="right"][data-position="bottom"][data-panel="filters"]');
-    if (filtersBtn && !filtersBtn.classList.contains('active')) {
-        // 取消同位置其他按钮的激活状态
-        if (activeButtons.right.bottom && activeButtons.right.bottom !== filtersBtn) {
-            activeButtons.right.bottom.classList.remove('active');
+            // 关键：调用 updateSidebarContent 来移动面板
+            updateSidebarContent('right', 'bottom', 'filters');
         }
-        filtersBtn.classList.add('active');
-        activeButtons.right.bottom = filtersBtn;
 
-        // 关键：调用 updateSidebarContent 来移动面板
-        updateSidebarContent('right', 'bottom', 'filters');
+        // 更新右侧边栏状态（打开侧边栏）
+        updateSidebarState('right');
     }
-
-    // 更新右侧边栏状态（打开侧边栏）
-    updateSidebarState('right');
 }
 
 
@@ -4047,7 +3952,7 @@ function showDifferenceStatistics() {
 /**
  * 从全局状态更新热力图
  */
-async function updateHeatmapFromGlobalState() {
+async function updateHeatmapFromGlobalState(activatePanel = true) {
     if (!globalUIState.dataSource.currentMatrix) {
         console.log('[热力图] 没有数据源，跳过更新');
         return;
@@ -4070,9 +3975,9 @@ async function updateHeatmapFromGlobalState() {
     // *** 修复Bug1: 先显示统计信息和激活右侧栏，再绘制热力图 ***
     if (globalUIState.dataSource.primaryIndex !== null) {
         if (globalUIState.dataSource.subtractIndex !== null) {
-            showDifferenceStatistics();
+            showDifferenceStatistics(activatePanel);
         } else {
-            showStatistics();
+            showStatistics(activatePanel);
         }
     }
 
@@ -4288,7 +4193,7 @@ function updateExportMatrixSelector() {
 
 // 页面加载时初始化
 // 注意: 大部分控件初始化已经移到rebindEventHandlers中,在侧边栏内容加载时才执行
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', function () {
     // 仅初始化全局控件(不在侧边栏中的)
     initColorSchemeSelector();
 
