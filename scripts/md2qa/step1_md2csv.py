@@ -5,40 +5,6 @@ from tqdm import tqdm
 from collections import defaultdict
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
-# 定义输入和输出文件夹
-input_folder = "./input/"
-output_folder = "./output/"
-
-# 创建输出文件夹（如果不存在）
-os.makedirs(output_folder, exist_ok=True)
-
-# 定义文本切分参数
-CHUNK_SIZE = 350
-MIN_CHUNK_SIZE = 100  # 最小块大小,小于此值的块将被合并
-
-# 定义文本切分器
-text_splitter = RecursiveCharacterTextSplitter(
-    separators=[
-        "\n\n",
-        "\n",
-        " ",
-        ".",
-        ",",
-        "\u200b",  # Zero-width space
-        "\uff0c",  # Fullwidth comma
-        "\u3001",  # Ideographic comma
-        "\uff0e",  # Fullwidth full stop
-        "\u3002",  # Ideographic full stop
-        "",
-    ],
-    chunk_size=CHUNK_SIZE,
-    chunk_overlap=0,
-    length_function=len,
-    is_separator_regex=False,
-)
-
-# 获取输入文件夹中的所有.md和.txt文件
-files = [f for f in os.listdir(input_folder) if f.endswith(".md") or f.endswith(".txt")]
 
 def merge_small_chunks(chunks, min_size):
     """
@@ -120,40 +86,59 @@ def merge_small_chunks(chunks, min_size):
 
     return merged_chunks
 
-# 字典用于存储替换信息
-replacement_dict = defaultdict(list)
 
-def replace_img(match, img_counter, replacement_dict, img_urls):
-    key = f"<img{img_counter}>"
-    replacement_dict[key] = match.group(0)
-    img_urls.append(match.group(1))  # 保存URL
-    return key, img_counter + 1
+def process_md_to_csv(input_folder, output_folder, chunk_size=350, min_chunk_size=100):
+    """
+    将 Markdown/文本文件处理为 CSV 文件
 
-def replace_text(match, text_counter, replacement_dict):
-    text = match.group(1)
-    text_counter[text] += 1
-    key = f"<{text}{text_counter[text] if text_counter[text] > 1 else ''}>"
-    replacement_dict[key] = match.group(0)
-    return key
+    参数:
+        input_folder: 输入文件夹路径
+        output_folder: 输出文件夹路径
+        chunk_size: 文本切分大小
+        min_chunk_size: 最小块大小,小于此值的块将被合并
 
-# 遍历文件并显示进度条
-for filename in tqdm(files, desc="Processing files"):
-    input_filepath = os.path.join(input_folder, filename)
+    逻辑:
+        - 读取所有 .md 和 .txt 文件
+        - 使用 RecursiveCharacterTextSplitter 切分文本
+        - 合并过小的块
+        - 提取图片URL、处理Markdown替换
+        - 生成 Position 层级结构
+        - 输出包含 Text, Text_pure, Img_url, Position 列的 CSV
+    """
+    # 创建输出文件夹(如果不存在)
+    os.makedirs(output_folder, exist_ok=True)
 
-    # 读取文件内容
-    with open(input_filepath, encoding='utf-8-sig') as f:
-        file_content = f.read()
+    # 定义文本切分器
+    text_splitter = RecursiveCharacterTextSplitter(
+        separators=[
+            "\n\n",
+            "\n",
+            " ",
+            ".", # 半角句读 大头使用
+            ",",
+            "،", # 阿拉伯文逗号
+            "،", # 全角句读
+            "。",
+            "、", # 日文逗号
+            "।", # 印地语句号
+            "\u200b",  # Zero-width space
+            "\uff0c",  # Fullwidth comma
+            "\u3001",  # Ideographic comma
+            "\uff0e",  # Fullwidth full stop
+            "\u3002",  # Ideographic full stop
+            "",
+        ],
+        chunk_size=chunk_size,
+        chunk_overlap=0,
+        length_function=len,
+        is_separator_regex=False,
+    )
 
-    # 预处理步骤
-    # 替换连续超过两个的*
-    file_content = re.sub(r'\*{3,}', '**', file_content)
-    # 替换连续超过三个的- 或 =
-    file_content = re.sub(r'\-{4,}', '---', file_content)
-    file_content = re.sub(r'\={4,}', '===', file_content)
+    # 获取输入文件夹中的所有.md和.txt文件
+    files = [f for f in os.listdir(input_folder) if f.endswith(".md") or f.endswith(".txt")]
 
-    img_counter = 1
-    text_counter = defaultdict(int)
-    img_urls_per_line = []
+    # 字典用于存储替换信息
+    replacement_dict = defaultdict(list)
 
     def replace_img(match, img_counter, replacement_dict):
         key = f"<img{img_counter}>"
@@ -166,62 +151,6 @@ for filename in tqdm(files, desc="Processing files"):
         key = f"<{text}{text_counter[text] if text_counter[text] > 1 else ''}>"
         replacement_dict[key] = match.group(0)
         return key
-
-    # 替换 ![img](url)
-    img_pattern = re.compile(r'!\[.*?\]\((.*?)\)')
-    img_matches = list(img_pattern.finditer(file_content))
-    for match in img_matches:
-        replacement, img_counter, img_url = replace_img(match, img_counter, replacement_dict)
-        file_content = file_content.replace(match.group(0), replacement)
-        img_urls_per_line.append(img_url)
-
-    # 替换 [text](url)
-    text_pattern = re.compile(r'\[(.*?)\]\(.*?\)')
-    text_matches = list(text_pattern.finditer(file_content))
-    for match in text_matches:
-        replacement = replace_text(match, text_counter, replacement_dict)
-        file_content = file_content.replace(match.group(0), replacement)
-
-
-    # 执行文本切分
-    texts = text_splitter.create_documents([file_content])
-
-    # 合并过小的块
-    merged_texts = merge_small_chunks(texts, MIN_CHUNK_SIZE)
-
-    # 创建DataFrame
-    df = pd.DataFrame(merged_texts, columns=['Text'])
-
-    # 还原替换的 <img%d> 和 <text%d>
-    def restore_replacement(text):
-        for key, value in replacement_dict.items():
-            text = text.replace(key, value)
-        return text
-
-    # 创建 Text_pure 列
-    df['Text_pure'] = df['Text']
-
-    def extract_img_urls(text):
-        img_keys = re.findall(r'<img\d+>', text)
-        img_urls = []
-        for key in img_keys:
-            if key in replacement_dict:
-                url_match = re.search(r'\((.*?)\)', replacement_dict[key])
-                if url_match:
-                    img_urls.append(url_match.group(1))
-        return ';'.join(img_urls)
-
-    df['Img_url'] = df['Text_pure'].apply(extract_img_urls)
-    # 还原 Text 列中的内容
-    df['Text'] = df['Text'].apply(restore_replacement)
-
-
-    # 保存为CSV文件
-    output_filename = f"{os.path.splitext(filename)[0]}.csv"
-    output_filepath = os.path.join(output_folder, output_filename)
-    df.to_csv(output_filepath, index=False, encoding='utf-8-sig')
-
-    print(f"Processed and saved: {output_filepath}")
 
     # 定义Markdown语法及其优先级
     markdown_priority = {
@@ -243,71 +172,154 @@ for filename in tqdm(files, desc="Processing files"):
         r'^\s*-+\s*$': 1   # 二级标题
     }
 
-    # 读取CSV文件内容
-    df = pd.read_csv(output_filepath, encoding='utf-8-sig')
+    # 遍历文件并显示进度条
+    for filename in tqdm(files, desc="Processing files"):
+        input_filepath = os.path.join(input_folder, filename)
 
-    # 初始化栈并将文件名作为初始位置
-    initial_position = os.path.splitext(filename)[0]
-    position_stack = [initial_position]
-    priority_stack = [-1]  # 初始优先级为-1,以确保文件名始终在最顶部
+        # 读取文件内容
+        with open(input_filepath, encoding='utf-8-sig') as f:
+            file_content = f.read()
 
-    # 定义位置列
-    df['Position'] = ""
+        # 预处理步骤
+        # 替换连续超过两个的*
+        file_content = re.sub(r'\*{3,}', '**', file_content)
+        # 替换连续超过三个的- 或 =
+        file_content = re.sub(r'\-{4,}', '---', file_content)
+        file_content = re.sub(r'\={4,}', '===', file_content)
 
-    # 用于记录连续相同位置的次数
-    last_position = ""
-    position_counter = 0
+        img_counter = 1
+        text_counter = defaultdict(int)
+        img_urls_per_line = []
+        replacement_dict = {}
 
-    # 逐行处理文本
-    for idx, row in df.iterrows():
-        text = row['Text']
-        sentences = re.split(r'\n+', text)  # 以换行符进行分句
+        # 替换 ![img](url)
+        img_pattern = re.compile(r'!\[.*?\]\((.*?)\)')
+        img_matches = list(img_pattern.finditer(file_content))
+        for match in img_matches:
+            replacement, img_counter, img_url = replace_img(match, img_counter, replacement_dict)
+            file_content = file_content.replace(match.group(0), replacement)
+            img_urls_per_line.append(img_url)
 
-        # 首先对每一行赋初始位置
-        current_position = ' > '.join(position_stack)
+        # 替换 [text](url)
+        text_pattern = re.compile(r'\[(.*?)\]\(.*?\)')
+        text_matches = list(text_pattern.finditer(file_content))
+        for match in text_matches:
+            replacement = replace_text(match, text_counter, replacement_dict)
+            file_content = file_content.replace(match.group(0), replacement)
 
-        # 检查是否与上一行位置相同
-        if current_position == last_position:
-            position_counter += 1
-            if position_counter == 2:  # 在第二次遇到时给上一个添加序号
-                df.at[idx - 1, 'Position'] += f" (part 1)"
-            current_position += f" (part {position_counter})"
-        else:
-            last_position = current_position
-            position_counter = 1
+        # 执行文本切分
+        texts = text_splitter.create_documents([file_content])
 
-        df.at[idx, 'Position'] = current_position
+        # 合并过小的块
+        merged_texts = merge_small_chunks(texts, min_chunk_size)
 
-        # 逐句处理文本
-        previous_sentence = ""
-        for sentence in sentences:
-            current_priority = None
+        # 创建DataFrame
+        df = pd.DataFrame(merged_texts, columns=['Text'])
 
-            # 判断当前句子的标题信息及其优先级
-            for grammar, priority in markdown_priority.items():
-                if re.match(grammar, sentence.strip()):
-                    current_priority = priority
-                    break
+        # 还原替换的 <img%d> 和 <text%d>
+        def restore_replacement(text):
+            for key, value in replacement_dict.items():
+                text = text.replace(key, value)
+            return text
 
-            # 特殊处理 `===` 和 `---` 的情况
-            for special_grammar, special_priority in special_syntax.items():
-                if re.match(special_grammar, sentence.strip()):
-                    current_priority = special_priority
-                    sentence = previous_sentence
-                    break
+        # 创建 Text_pure 列
+        df['Text_pure'] = df['Text']
 
-            # 更新位置栈和优先级栈
-            if current_priority is not None:
-                while priority_stack and priority_stack[-1] >= current_priority:
-                    position_stack.pop()
-                    priority_stack.pop()
+        def extract_img_urls(text):
+            img_keys = re.findall(r'<img\d+>', text)
+            img_urls = []
+            for key in img_keys:
+                if key in replacement_dict:
+                    url_match = re.search(r'\((.*?)\)', replacement_dict[key])
+                    if url_match:
+                        img_urls.append(url_match.group(1))
+            return ';'.join(img_urls)
 
-                position_stack.append(sentence.strip())
-                priority_stack.append(current_priority)
+        df['Img_url'] = df['Text_pure'].apply(extract_img_urls)
+        # 还原 Text 列中的内容
+        df['Text'] = df['Text'].apply(restore_replacement)
 
-            previous_sentence = sentence
+        # 保存为CSV文件
+        output_filename = f"{os.path.splitext(filename)[0]}.csv"
+        output_filepath = os.path.join(output_folder, output_filename)
+        df.to_csv(output_filepath, index=False, encoding='utf-8-sig')
 
-    # 保存更新后的CSV文件
-    df.to_csv(output_filepath, index=False, encoding='utf-8-sig')
+        print(f"Processed and saved: {output_filepath}")
 
-    print(f"Refined and saved: {output_filepath}")
+        # 读取CSV文件内容
+        df = pd.read_csv(output_filepath, encoding='utf-8-sig')
+
+        # 初始化栈并将文件名作为初始位置
+        initial_position = os.path.splitext(filename)[0]
+        position_stack = [initial_position]
+        priority_stack = [-1]  # 初始优先级为-1,以确保文件名始终在最顶部
+
+        # 定义位置列
+        df['Position'] = ""
+
+        # 用于记录连续相同位置的次数
+        last_position = ""
+        position_counter = 0
+
+        # 逐行处理文本
+        for idx, row in df.iterrows():
+            text = row['Text']
+            sentences = re.split(r'\n+', text)  # 以换行符进行分句
+
+            # 首先对每一行赋初始位置
+            current_position = ' > '.join(position_stack)
+
+            # 检查是否与上一行位置相同
+            if current_position == last_position:
+                position_counter += 1
+                if position_counter == 2:  # 在第二次遇到时给上一个添加序号
+                    df.at[idx - 1, 'Position'] += f" (part 1)"
+                current_position += f" (part {position_counter})"
+            else:
+                last_position = current_position
+                position_counter = 1
+
+            df.at[idx, 'Position'] = current_position
+
+            # 逐句处理文本
+            previous_sentence = ""
+            for sentence in sentences:
+                current_priority = None
+
+                # 判断当前句子的标题信息及其优先级
+                for grammar, priority in markdown_priority.items():
+                    if re.match(grammar, sentence.strip()):
+                        current_priority = priority
+                        break
+
+                # 特殊处理 `===` 和 `---` 的情况
+                for special_grammar, special_priority in special_syntax.items():
+                    if re.match(special_grammar, sentence.strip()):
+                        current_priority = special_priority
+                        sentence = previous_sentence
+                        break
+
+                # 更新位置栈和优先级栈
+                if current_priority is not None:
+                    while priority_stack and priority_stack[-1] >= current_priority:
+                        position_stack.pop()
+                        priority_stack.pop()
+
+                    position_stack.append(sentence.strip())
+                    priority_stack.append(current_priority)
+
+                previous_sentence = sentence
+
+        # 保存更新后的CSV文件
+        df.to_csv(output_filepath, index=False, encoding='utf-8-sig')
+
+        print(f"Refined and saved: {output_filepath}")
+
+
+if __name__ == "__main__":
+    # 定义输入和输出文件夹
+    input_folder = "./input/GT_ML_TEST/"
+    output_folder = "./output/GT_ML_TEST/"
+
+    # 执行处理
+    process_md_to_csv(input_folder, output_folder)
