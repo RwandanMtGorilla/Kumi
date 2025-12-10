@@ -674,6 +674,21 @@
         </div>
 
         <div class="form-group">
+            <label class="form-label" for="embeddingModel">Embedding模型:</label>
+            <div style="display: flex; gap: 10px;">
+                <select id="embeddingModel" class="form-select" style="flex: 1;" required>
+                    <option value="">加载中...</option>
+                </select>
+                <button type="button" id="testEmbeddingBtn" class="btn btn-secondary" style="min-width: 100px;">
+                    测试接口
+                </button>
+            </div>
+            <small style="color: #6b7280;">
+                选择用于文本向量化的embedding模型
+            </small>
+        </div>
+
+        <div class="form-group">
             <label class="form-label" for="collectionName">Collection名称:</label>
             <input type="text" id="collectionName" class="form-input"
                    placeholder="自动生成，可手动修改"
@@ -734,6 +749,8 @@
     let currentTaskId = null;
     let progressInterval = null;
     let advancedConfigEnabled = false;
+    let embeddingModels = [];
+    let defaultEmbeddingModel = null;
 
     // DOM元素
     const fileDropZone = document.getElementById('fileDropZone');
@@ -748,11 +765,14 @@
     const batchSize = document.getElementById('batchSize');
     const availableFields = document.getElementById('availableFields');
     const documentTemplate = document.getElementById('documentTemplate');
+    const embeddingModel = document.getElementById('embeddingModel');
+    const testEmbeddingBtn = document.getElementById('testEmbeddingBtn');
 
     // 初始化
     document.addEventListener('DOMContentLoaded', function() {
         initializeEventListeners();
         loadTemplates();
+        loadEmbeddingModels();
     });
 
     function initializeEventListeners() {
@@ -774,6 +794,15 @@
 
         document.getElementById('advancedConfigBtn').addEventListener('click', toggleAdvancedConfig);
 
+        // 测试embedding按钮
+        testEmbeddingBtn.addEventListener('click', testEmbeddingConnection);
+
+        // 模型选择变化时,更新collection名称
+        embeddingModel.addEventListener('change', function() {
+            if (selectedFile) {
+                generateDefaultCollectionName();
+            }
+        });
 
         collectionName.addEventListener('input', function() {
             const validation = validateCollectionName(this.value);
@@ -1048,17 +1077,39 @@
                 filename = 'document';
             }
 
-            // 生成完整名称
-            let defaultName = `${filename}_${dateStr}`;
+            // 获取模型缩写
+            let modelAbbr = '';
+            const selectedModel = embeddingModel.value;
+            if (selectedModel) {
+                // 解析 "provider,model" 格式
+                const parts = selectedModel.split(',');
+                if (parts.length === 2) {
+                    const modelName = parts[1].trim();
+                    modelAbbr = generateModelAbbreviation(modelName);
+                }
+            }
+
+            // 生成完整名称: filename_modelAbbr_dateStr
+            let defaultName;
+            if (modelAbbr) {
+                defaultName = `${filename}_${modelAbbr}_${dateStr}`;
+            } else {
+                defaultName = `${filename}_${dateStr}`;
+            }
 
             // 确保总长度在3-512字符之间
             if (defaultName.length < 3) {
                 defaultName = `doc_${dateStr}`;
             } else if (defaultName.length > 512) {
-                // 截断文件名部分，保留日期
-                const maxFilenameLength = 512 - dateStr.length - 1; // -1 for underscore
+                // 截断文件名部分，保留模型缩写和日期
+                const fixedPartLength = (modelAbbr ? modelAbbr.length + 1 : 0) + dateStr.length + 1; // +1 for underscores
+                const maxFilenameLength = 512 - fixedPartLength;
                 filename = filename.substring(0, maxFilenameLength);
-                defaultName = `${filename}_${dateStr}`;
+                if (modelAbbr) {
+                    defaultName = `${filename}_${modelAbbr}_${dateStr}`;
+                } else {
+                    defaultName = `${filename}_${dateStr}`;
+                }
             }
 
             // 最终验证：确保符合完整规则
@@ -1068,6 +1119,73 @@
             }
 
             collectionName.value = defaultName;
+        }
+    }
+
+    // 生成模型缩写
+    function generateModelAbbreviation(modelName) {
+        // 规则:
+        // - 字母: 如果模型名中存在`/`则从`/`开始往右取三个字母，否则直接从最左往右取三个字母
+        // - 数字: 从模型名中最靠右的一个数字开始往左取连续的数字(包含小数点`.`)，最多三位
+        // - 格式: f"{字母}-{数字}"
+
+        // 提取字母部分
+        let leftPart = "";
+        if (modelName.includes('/')) {
+            // 从`/`后开始取字母
+            const afterSlash = modelName.split('/').pop();
+            const letterMatch = afterSlash.match(/[a-zA-Z]{1,3}/);
+            leftPart = letterMatch ? letterMatch[0] : "";
+        } else {
+            // 从最左边开始取字母
+            const letterMatch = modelName.match(/[a-zA-Z]{1,3}/);
+            leftPart = letterMatch ? letterMatch[0] : "";
+        }
+
+        // 提取数字部分：从最右边的数字开始往左取连续的数字(包含小数点)，最多三位
+        let rightPart = "";
+
+        // 先找到最右边的数字位置
+        let rightmostDigitPos = -1;
+        for (let i = modelName.length - 1; i >= 0; i--) {
+            if (/\d/.test(modelName[i])) {
+                rightmostDigitPos = i;
+                break;
+            }
+        }
+
+        if (rightmostDigitPos >= 0) {
+            // 从这个位置往左取连续的数字和小数点
+            let startPos = rightmostDigitPos;
+            for (let i = rightmostDigitPos - 1; i >= 0; i--) {
+                if (/\d/.test(modelName[i]) || modelName[i] === '.') {
+                    startPos = i;
+                } else {
+                    break;
+                }
+            }
+
+            // 提取数字部分
+            let numberStr = modelName.substring(startPos, rightmostDigitPos + 1);
+
+            // 限制最多三位（包括小数点）
+            if (numberStr.length > 3) {
+                // 优先保留最右边的部分
+                numberStr = numberStr.slice(-3);
+            }
+
+            rightPart = numberStr;
+        }
+
+        // 组合结果
+        if (leftPart && rightPart) {
+            return `${leftPart}-${rightPart}`;
+        } else if (leftPart) {
+            return leftPart;
+        } else if (rightPart) {
+            return rightPart;
+        } else {
+            return "emb";  // 默认值
         }
     }
 
@@ -1118,6 +1236,72 @@
         `).join('');
     }
 
+    async function loadEmbeddingModels() {
+        try {
+            const response = await fetch('/web/api/knowledge/embedding/models');
+            const result = await response.json();
+
+            if (result.status === 'success') {
+                embeddingModels = result.data.models;
+                defaultEmbeddingModel = result.data.default;
+                renderEmbeddingModels();
+            } else {
+                embeddingModel.innerHTML = '<option value="">加载失败</option>';
+                showAlert('error', '加载embedding模型列表失败: ' + result.message);
+            }
+        } catch (error) {
+            console.error('加载embedding模型失败:', error);
+            embeddingModel.innerHTML = '<option value="">加载失败</option>';
+            showAlert('error', '加载embedding模型列表失败: ' + error.message);
+        }
+    }
+
+    function renderEmbeddingModels() {
+        embeddingModel.innerHTML = embeddingModels.map(model => {
+            const isDefault = defaultEmbeddingModel && model.display_name === defaultEmbeddingModel.display_name;
+            return `<option value="${model.display_name}" ${isDefault ? 'selected' : ''}>${model.display_name}</option>`;
+        }).join('');
+    }
+
+    async function testEmbeddingConnection() {
+        const selectedModel = embeddingModel.value;
+        if (!selectedModel) {
+            showAlert('error', '请先选择embedding模型');
+            return;
+        }
+
+        // 禁用按钮,防止重复点击
+        testEmbeddingBtn.disabled = true;
+        testEmbeddingBtn.textContent = '测试中...';
+
+        try {
+            const response = await fetch('/web/api/knowledge/embedding/test', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    model: selectedModel
+                })
+            });
+
+            const result = await response.json();
+
+            if (result.status === 'success') {
+                showTemporaryMessage(`✅ 连接成功! 维度: ${result.data.dimension}`, 'success');
+            } else {
+                showAlert('error', '测试失败: ' + result.message);
+            }
+        } catch (error) {
+            console.error('测试embedding连接失败:', error);
+            showAlert('error', '测试失败: ' + error.message);
+        } finally {
+            // 恢复按钮
+            testEmbeddingBtn.disabled = false;
+            testEmbeddingBtn.textContent = '测试接口';
+        }
+    }
+
     function selectTemplate(templateName) {
         clearTemplateSelection();
 
@@ -1159,6 +1343,7 @@
         const docTemplate = documentTemplate.value.trim();
         const collection = collectionName.value.trim();
         const batch = parseInt(batchSize.value);
+        const selectedModel = embeddingModel.value;
 
         // 验证参数
         if (!embeddingTemplate) {
@@ -1168,6 +1353,11 @@
 
         if (!docTemplate) {
             showAlert('error', '请输入document模板');
+            return;
+        }
+
+        if (!selectedModel) {
+            showAlert('error', '请选择embedding模型');
             return;
         }
 
@@ -1197,6 +1387,7 @@
             formData.append('document_template', docTemplate);
             formData.append('collection_name', collection);
             formData.append('batch_size', batch);
+            formData.append('embedding_model', selectedModel);
 
             // 创建任务
             const response = await fetch('/web/api/knowledge/upload/process', {
