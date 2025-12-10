@@ -2,7 +2,7 @@ Providers:
 
   - name: local # 填个你认得出的供应商名称 和 default中的供应商名对应
     api_base_url: http://127.0.0.1:8504
-    api_key: sk-xxx
+    api_key: 123
     models:
       - Qwen3-Embedding-0.6B
 
