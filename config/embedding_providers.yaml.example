@@ -1,0 +1,18 @@
+Providers:
+  - name: openrouter # 填个你认得出的供应商名称 和 default中的供应商名对应
+    api_base_url: https://openrouter.ai/api # 填api地址 /v1和后面舍去
+    api_key: sk-or-v1-xxx # 填key
+    models:
+      - thenlper/gte-base # 填模型名 可以多个 （如果有的话）
+      - baai/bge-m3
+      - google/gemini-embedding-001
+      - qwen/qwen3-embedding-8b
+
+  - name: local # 多个供应商 （如果有的话 下同）
+    api_base_url: http://127.0.0.1:8504
+    api_key: sk-xxx
+    models:
+      - Qwen3-Embedding-0.6B
+
+Router: # 默认使用的模型
+  default: openrouter,google/gemini-embedding-001

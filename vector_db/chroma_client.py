@@ -4,7 +4,7 @@ from datetime import datetime
 import uuid
 import numpy as np
 from .base import VectorDBInterface
-from .embedding_client import QwenEmbeddingAPI
+from .embedding_client import OpenAIEmbeddingAPI
 from config.settings import settings
 
 
@@ -19,7 +19,7 @@ class ChromaDBClient(VectorDBInterface):
         self.client = chromadb.HttpClient(host=self.host, port=self.port)
 
         # 初始化embedding客户端
-        self.embedding_api = QwenEmbeddingAPI()
+        self.embedding_api = OpenAIEmbeddingAPI()
 
         print(f"✅ ChromaDB客户端初始化完成")
         print(f"   地址: {self.host}:{self.port}")
@@ -63,13 +63,18 @@ class ChromaDBClient(VectorDBInterface):
                 pass
 
             # 创建新集合
+            base_metadata = {
+                "description": f"Collection created at {datetime.now()}",
+                **kwargs.get('metadata', {})
+            }
+
+            # 只有在embedding_dim不为None时才添加
+            if self.embedding_api.embedding_dim is not None:
+                base_metadata["embedding_dimension"] = self.embedding_api.embedding_dim
+
             collection = self.client.create_collection(
                 name=collection_name,
-                metadata={
-                    "description": f"Collection created at {datetime.now()}",
-                    "embedding_dimension": self.embedding_api.embedding_dim,
-                    **kwargs.get('metadata', {})
-                }
+                metadata=base_metadata
             )
 
             print(f"✅ Collection '{collection_name}' 创建成功")

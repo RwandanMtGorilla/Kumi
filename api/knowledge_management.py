@@ -367,7 +367,8 @@ async def process_upload_file(
         embedding_template: str = Form(...),
         document_template: str = Form(...),
         collection_name: str = Form(...),
-        batch_size: int = Form(5)
+        batch_size: int = Form(5),
+        embedding_model: str = Form(None)  # "provider,model" 格式
 ):
     """处理文件上传和向量化（异步处理）"""
     try:
@@ -417,6 +418,19 @@ async def process_upload_file(
                 "message": "批处理大小必须在1-1000之间"
             }, status_code=400)
 
+        # 解析embedding模型
+        embedding_provider = None
+        embedding_model_name = None
+        if embedding_model:
+            try:
+                embedding_provider, embedding_model_name = knowledge_service.embedding_service.parse_model_identifier(embedding_model)
+                logger.info(f"任务 {task_id} 使用embedding模型: {embedding_provider},{embedding_model_name}")
+            except Exception as e:
+                return JSONResponse({
+                    "status": "error",
+                    "message": f"无效的embedding模型标识符: {str(e)}"
+                }, status_code=400)
+
         # 读取文件内容
         file_content = await file.read()
 
@@ -430,7 +444,9 @@ async def process_upload_file(
             document_template,
             collection_name,
             batch_size,
-            progress_storage
+            progress_storage,
+            embedding_provider,
+            embedding_model_name
         )
 
         return JSONResponse({
@@ -516,7 +532,7 @@ async def get_embedding_templates(request: Request):
             {
                 "name": "问题检索模板",
                 "description": "适用于问题检索场景",
-                "template": "Instruct: Given a customer query, retrieve the most relevant chunks needed to answer the query. \nQuery:{question}",
+                "template": "Instruct: Given a web search query, retrieve relevant passages that answer the query\nQuery:{question}",
                 "required_fields": ["question"]
             },
             {
@@ -539,4 +555,83 @@ async def get_embedding_templates(request: Request):
         return JSONResponse({
             "status": "error",
             "message": f"获取模板失败: {str(e)}"
+        }, status_code=500)
+
+
+@router.get("/api/knowledge/embedding/models")
+async def get_embedding_models(request: Request):
+    """获取所有可用的embedding模型"""
+    try:
+        user = get_user_from_request(request)
+
+        # 获取模型列表
+        models = knowledge_service.embedding_service.get_available_models()
+        default_model = knowledge_service.embedding_service.get_default_model()
+
+        return JSONResponse({
+            "status": "success",
+            "data": {
+                "models": models,
+                "default": default_model
+            }
+        })
+
+    except Exception as e:
+        logger.error(f"获取embedding模型列表失败: {e}")
+        return JSONResponse({
+            "status": "error",
+            "message": f"获取模型列表失败: {str(e)}"
+        }, status_code=500)
+
+
+@router.post("/api/knowledge/embedding/test")
+async def test_embedding_connection(request: Request):
+    """测试embedding API连接"""
+    try:
+        user = get_user_from_request(request)
+
+        # 获取请求参数
+        data = await request.json()
+        model_identifier = data.get("model")  # "provider,model" 格式
+
+        if not model_identifier:
+            return JSONResponse({
+                "status": "error",
+                "message": "请提供模型标识符"
+            }, status_code=400)
+
+        # 解析模型标识符
+        try:
+            provider, model = knowledge_service.embedding_service.parse_model_identifier(model_identifier)
+        except Exception as e:
+            return JSONResponse({
+                "status": "error",
+                "message": f"无效的模型标识符: {str(e)}"
+            }, status_code=400)
+
+        # 测试连接
+        logger.info(f"用户 {user.get('username', 'unknown')} 测试embedding连接: {provider},{model}")
+        result = knowledge_service.embedding_service.test_connection(provider, model)
+
+        if result["success"]:
+            return JSONResponse({
+                "status": "success",
+                "message": result["message"],
+                "data": {
+                    "dimension": result["dimension"],
+                    "provider": provider,
+                    "model": model
+                }
+            })
+        else:
+            return JSONResponse({
+                "status": "error",
+                "message": result["message"]
+            }, status_code=500)
+
+    except Exception as e:
+        logger.error(f"测试embedding连接失败: {e}")
+        return JSONResponse({
+            "status": "error",
+            "message": f"测试连接失败: {str(e)}"
         }, status_code=500)

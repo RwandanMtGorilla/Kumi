@@ -7,6 +7,13 @@ from pathlib import Path
 # 加载环境变量
 load_dotenv()
 
+# 导入embedding配置
+try:
+    from config.embedding_config import EmbeddingConfig
+    _embedding_config = None  # 延迟加载
+except ImportError:
+    _embedding_config = None
+
 
 class Settings:
     """应用配置类"""
@@ -41,10 +48,15 @@ class Settings:
                                     ".pdf,.docx,.pptx,.xlsx,.xls,.txt,.md,.html,.csv,.wav,.mp3")
     MARKITDOWN_ALLOWED_EXTENSIONS: List[str] = [ext.strip() for ext in _allowed_extensions.split(",")]
 
+    # MySQL数据库配置
+    MYSQL_HOST: str = os.getenv("MYSQL_HOST", "some.sql.com")
+    MYSQL_PORT: int = int(os.getenv("MYSQL_PORT", "3306"))
+    MYSQL_USER: str = os.getenv("MYSQL_USER", "user")
+    MYSQL_PASSWORD: str = os.getenv("MYSQL_PASSWORD", "")
+    MYSQL_DATABASE: str = os.getenv("MYSQL_DATABASE", "")
+
     # Chroma向量数据库配置
     vector_db_type: str = os.getenv('VECTOR_DB_TYPE', 'chroma')
-    vector_db_host: str = os.getenv('VECTOR_DB_HOST', 'localhost')
-    vector_db_port: int = int(os.getenv('VECTOR_DB_PORT', '8000'))
 
     # Milvus Configuration
     milvus_host: str = os.getenv('MILVUS_HOST', 'localhost')
@@ -56,10 +68,8 @@ class Settings:
     chroma_host: str = os.getenv('CHROMA_HOST', 'localhost')
     chroma_port: int = int(os.getenv('CHROMA_PORT', '8000'))
 
-    # Embedding API Configuration
-    embedding_api_url: str = os.getenv('EMBEDDING_API_URL', 'http://localhost:8504')
-    embedding_api_token: str = os.getenv('EMBEDDING_API_TOKEN', '123')
-    embedding_model: str = os.getenv('EMBEDDING_MODEL', 'Qwen3-Embedding-0.6B')
+    # Embedding配置文件路径
+    _EMBEDDING_CONFIG_PATH: str = os.getenv('EMBEDDING_CONFIG_PATH', 'config/embedding_providers.yaml')
 
     VERIFY_TOKEN: str = os.getenv('VERIFY_TOKEN', 'NOTPOSSIBLEADMINp0ss')
 
@@ -170,6 +180,24 @@ class Settings:
         print(f"   YAML规则: {self.YAML_RULES_PATH}")
 
     @property
+    def mysql_url(self) -> str:
+        """构建MySQL连接URL，使用正确的PyMySQL参数"""
+        # 对用户名和密码进行URL编码，处理特殊字符
+        encoded_user = quote_plus(self.MYSQL_USER)
+        encoded_password = quote_plus(self.MYSQL_PASSWORD)
+
+        # PyMySQL 连接参数 (转换自JDBC参数)
+        params = [
+            "charset=utf8mb4",  # 对应 characterEncoding=UTF-8
+            "use_unicode=1",  # 对应 useUnicode=true
+            "ssl_disabled=1",  # 对应 useSSL=false
+            "autocommit=0",  # 对应 autocommit=false
+            "sql_mode=TRADITIONAL"  # 严格模式
+        ]
+        param_string = "&".join(params)
+        return f"mysql+pymysql://{encoded_user}:{encoded_password}@{self.MYSQL_HOST}:{self.MYSQL_PORT}/{self.MYSQL_DATABASE}?{param_string}"
+
+    @property
     def chroma_url(self) -> str:
         """构建Chroma连接URL"""
         return f"http://{self.CHROMA_HOST}:{self.CHROMA_PORT}"
@@ -183,6 +211,24 @@ class Settings:
     def ddl_export_path(self) -> str:
         """获取DDL导出目录完整路径"""
         return os.path.join(self.resource_dir, self.DDL_EXPORT_DIR)
+
+    @property
+    def EMBEDDING_CONFIG_PATH(self) -> str:
+        """获取embedding配置文件完整路径"""
+        return str(Path(self.PROJECT_ROOT) / self._EMBEDDING_CONFIG_PATH)
+
+    def get_embedding_config(self) -> 'EmbeddingConfig':
+        """
+        获取embedding配置实例(单例模式)
+
+        Returns:
+            EmbeddingConfig实例
+        """
+        global _embedding_config
+        if _embedding_config is None:
+            from config.embedding_config import EmbeddingConfig
+            _embedding_config = EmbeddingConfig(self.EMBEDDING_CONFIG_PATH)
+        return _embedding_config
 
 
 # 创建全局配置实例

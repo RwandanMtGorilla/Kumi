@@ -123,8 +123,20 @@ async def calculate_similarity_matrix(request: SimilarityRequest):
             "vector_db_type": settings.vector_db_type
         }
 
+    except ValueError as e:
+        # 维度不匹配等业务逻辑错误,返回正常响应但标记失败
+        error_msg = str(e)
+        logger.warning(f"⚠️ 相似度计算失败 ({x_collection} vs {y_collection}): {error_msg}")
+        return {
+            "success": False,
+            "error": error_msg,
+            "error_type": "dimension_mismatch" if "维度不匹配" in error_msg else "calculation_error",
+            "x_collection": x_collection,
+            "y_collection": y_collection
+        }
     except Exception as e:
-        logger.error(f"❌ 相似度计算API失败: {e}")
+        # 系统级错误,仍然抛出 HTTP 异常
+        logger.error(f"❌ 相似度计算API系统错误: {e}")
         raise HTTPException(
             status_code=500,
             detail={"success": False, "error": str(e)}

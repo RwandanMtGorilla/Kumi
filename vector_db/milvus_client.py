@@ -2,7 +2,7 @@ from pymilvus import MilvusClient, DataType
 from typing import List, Dict, Any
 import pandas as pd
 from .base import VectorDBInterface
-from .embedding_client import QwenEmbeddingAPI
+from .embedding_client import OpenAIEmbeddingAPI
 from config.settings import settings
 
 
@@ -20,7 +20,7 @@ class MilvusDBClient(VectorDBInterface):
         self.client = MilvusClient(uri=uri, token=f"{self.user}:{self.password}")
 
         # 初始化embedding客户端
-        self.embedding_api = QwenEmbeddingAPI()
+        self.embedding_api = OpenAIEmbeddingAPI()
 
         print(f"✅ Milvus客户端初始化完成")
         print(f"   地址: {uri}")

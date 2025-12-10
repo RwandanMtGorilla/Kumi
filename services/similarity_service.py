@@ -5,8 +5,9 @@ import numpy as np
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from vector_db.factory import VectorDBFactory
-from vector_db.embedding_client import QwenEmbeddingAPI
+from vector_db.embedding_client import OpenAIEmbeddingAPI
 from config.settings import settings
+from config.embedding_config import EmbeddingConfig
 
 
 class SimilarityCalculator:
@@ -19,7 +20,10 @@ class SimilarityCalculator:
         self.db_client = VectorDBFactory.create_client(db_type)
 
         # 初始化embedding API
-        self.embedding_api = QwenEmbeddingAPI()
+        self.embedding_api = OpenAIEmbeddingAPI()
+
+        # 初始化embedding配置
+        self.embedding_config = EmbeddingConfig()
 
         print(f"✅ 相似度计算引擎初始化完成")
         print(f"   数据库类型: {settings.vector_db_type}")
@@ -42,6 +46,10 @@ class SimilarityCalculator:
         except Exception as e:
             embedding_status = f"failed: {str(e)}"
 
+        # 获取默认模型信息
+        provider_name, model_name = self.embedding_config.get_default_model()
+        model_info = self.embedding_config.get_model_info(provider_name, model_name)
+
         return {
             "vector_db": {
                 "type": settings.vector_db_type,
@@ -50,8 +58,8 @@ class SimilarityCalculator:
             },
             "embedding_api": {
                 "status": embedding_status,
-                "base_url": settings.embedding_api_url,
-                "model": settings.embedding_model
+                "base_url": model_info.get("api_base_url", "") if model_info else "",
+                "model": f"{provider_name},{model_name}"
             }
         }
 

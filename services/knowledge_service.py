@@ -1,6 +1,6 @@
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from vector_db.factory import VectorDBFactory
-from vector_db.embedding_client import QwenEmbeddingAPI
+from services.embedding_service import EmbeddingService
 from api.models import RetrievalRequest, RetrievalResponse, RetrievalRecord, MetadataFilter, ComparisonOperator
 import logging
 import asyncio
@@ -23,7 +23,7 @@ class KnowledgeService:
 
     def __init__(self):
         self.vector_client = VectorDBFactory.create_client()
-        self.embedding_client = QwenEmbeddingAPI()
+        self.embedding_service = EmbeddingService()
 
     async def search(self, request: RetrievalRequest) -> RetrievalResponse:
         """
@@ -67,13 +67,30 @@ class KnowledgeService:
             logger.error(f"搜索失败: {e}")
             raise
 
-    async def _vectorize_query(self, query: str) -> List[List[float]]:
-        """向量化查询文本"""
+    async def _vectorize_query(
+            self,
+            query: str,
+            provider_name: str = None,
+            model_name: str = None
+    ) -> List[List[float]]:
+        """
+        向量化查询文本
+
+        Args:
+            query: 查询文本
+            provider_name: embedding供应商名称,None表示使用默认
+            model_name: embedding模型名称,None表示使用默认
+        """
         try:
             # 使用asyncio在线程池中运行同步函数
             loop = asyncio.get_event_loop()
             embeddings = await loop.run_in_executor(
-                None, self.embedding_client.encode_texts, [query]
+                None,
+                self.embedding_service.encode_texts,
+                [query],
+                provider_name,
+                model_name,
+                1  # batch_size=1 for single query
             )
             return embeddings
         except Exception as e:
@@ -682,7 +699,9 @@ class KnowledgeService:
             document_template: str,
             collection_name: str,
             batch_size: int,
-            progress_storage: dict
+            progress_storage: dict,
+            embedding_provider: str = None,
+            embedding_model: str = None
     ):
         """异步处理文件向量化（带进度追踪）"""
         try:
@@ -782,9 +801,8 @@ class KnowledgeService:
                 self.update_progress(task_id, progress_storage, "生成向量嵌入", 4, total_stages,
                                      message="正在计算向量嵌入...", sub_progress=0.1)  # 文本生成完成，给予10%的子进度
 
-                # 【重要】设置embedding API的批处理大小
-                logger.info(f"任务 {task_id} 设置embedding API批处理大小为: {batch_size}")
-                self.embedding_client.set_batch_size(batch_size)
+                # 【重要】记录使用的embedding模型
+                logger.info(f"任务 {task_id} 使用embedding模型: provider={embedding_provider}, model={embedding_model}, batch_size={batch_size}")
 
                 # 定义embedding进度回调函数
                 def embedding_progress_callback(completed_batches: int, total_embedding_batches: int, message: str):
@@ -804,9 +822,12 @@ class KnowledgeService:
                 loop = asyncio.get_event_loop()
                 vectors = await loop.run_in_executor(
                     None,
-                    self.embedding_client.encode_texts_with_progress,
+                    self.embedding_service.encode_texts_with_progress,
                     embedding_texts,
-                    embedding_progress_callback
+                    embedding_progress_callback,
+                    embedding_provider,
+                    embedding_model,
+                    batch_size
                 )
 
                 # 阶段4: 生成向量嵌入 - 完成
@@ -893,6 +914,8 @@ class KnowledgeService:
                         "inserted_records": inserted_count,
                         "embedding_template_used": embedding_template,
                         "document_template_used": document_template,
+                        "embedding_provider": embedding_provider or "default",
+                        "embedding_model": embedding_model or "default",
                         "batch_size": batch_size,
                         "total_batches": total_batches,
                         "collection_stats": stats

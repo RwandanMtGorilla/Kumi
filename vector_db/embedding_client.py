@@ -2,16 +2,23 @@ import time
 import requests
 from typing import List, Callable, Optional
 from config.settings import settings
+from config.embedding_config import EmbeddingConfig
 import threading
 
 
-class _QwenEmbeddingAPI:
-    """Qwen3 Embedding API 客户端 - 内部单例实现"""
+class _OpenAIEmbeddingAPI:
+    """OpenAI Embedding API 客户端 - 内部单例实现"""
 
     def __init__(self, base_url: str = None, token: str = None, model: str = None, max_batch_size: int = 100):
-        self.base_url = (base_url or settings.embedding_api_url).rstrip('/')
-        self.token = token or settings.embedding_api_token
-        self.model = model or settings.embedding_model
+        # 初始化embedding配置
+        embedding_config = EmbeddingConfig()
+        provider_name, model_name = embedding_config.get_default_model()
+        model_info = embedding_config.get_model_info(provider_name, model_name)
+
+        # 使用新配置系统获取配置,允许通过参数覆盖
+        self.base_url = (base_url or (model_info.get("api_base_url") if model_info else "")).rstrip('/')
+        self.token = token or (model_info.get("api_key") if model_info else "")
+        self.model = model or f"{provider_name},{model_name}"
         self.headers = {
             "Authorization": f"Bearer {self.token}",
             "Content-Type": "application/json"
@@ -22,11 +29,10 @@ class _QwenEmbeddingAPI:
         self._initialized = False
         self._lock = threading.Lock()
 
-        # 延迟初始化
-        self._lazy_init()
+        print(f"🔄 OpenAIEmbeddingAPI 已创建 (model: {self.model}, batch_size: {self.max_batch_size})")
 
     def _lazy_init(self):
-        """延迟初始化，确保只初始化一次"""
+        """延迟初始化,在第一次实际调用时初始化"""
         if self._initialized:
             return
 
@@ -34,10 +40,12 @@ class _QwenEmbeddingAPI:
             if self._initialized:
                 return
 
-            # 测试连接并获取维度
-            self._test_connection()
+            print(f"🔍 首次调用,正在获取 embedding 维度...")
+            # 在第一次调用时获取维度,而不是在初始化时
+            if self.embedding_dim is None:
+                self.embedding_dim = self._get_actual_embedding_dimension()
             self._initialized = True
-            print("🔄 QwenEmbeddingAPI 单例已初始化")
+            print(f"✅ OpenAIEmbeddingAPI 初始化完成,维度: {self.embedding_dim}")
 
     def set_batch_size(self, batch_size: int):
         """动态设置批处理大小"""
@@ -45,20 +53,36 @@ class _QwenEmbeddingAPI:
         self.max_batch_size = batch_size
         print(f"📦 Embedding批处理大小已设置为: {self.max_batch_size}")
 
-    def _test_connection(self):
-        """测试API连接并获取实际的embedding维度"""
+    def test_connection(self):
+        """
+        测试API连接(手动调用)
+
+        Returns:
+            dict: {"success": bool, "message": str, "dimension": int}
+        """
         try:
-            response = requests.get(f"{self.base_url}/health", timeout=60)
+            response = requests.get(f"{self.base_url}/health", timeout=10)
             if response.status_code == 200:
                 health_status = response.text.strip('"')
-                print(f"✅ API连接成功: {health_status}")
-                self.embedding_dim = self._get_actual_embedding_dimension()
-                print(f"📐 实际Embedding维度: {self.embedding_dim}")
+                # 获取维度
+                dimension = self._get_actual_embedding_dimension()
+                return {
+                    "success": True,
+                    "message": f"API连接成功: {health_status}",
+                    "dimension": dimension
+                }
             else:
-                raise Exception(f"API健康检查失败: {response.status_code}")
+                return {
+                    "success": False,
+                    "message": f"API健康检查失败: {response.status_code}",
+                    "dimension": None
+                }
         except Exception as e:
-            print(f"❌ API连接失败: {e}")
-            raise
+            return {
+                "success": False,
+                "message": f"API连接失败: {str(e)}",
+                "dimension": None
+            }
 
     def _get_actual_embedding_dimension(self) -> int:
         """通过实际调用API获取embedding维度"""
@@ -208,13 +232,13 @@ _embedding_instance = None
 _embedding_lock = threading.Lock()
 
 
-class QwenEmbeddingAPI:
-    """QwenEmbeddingAPI 的代理类，确保始终返回同一个实例"""
+class OpenAIEmbeddingAPI:
+    """OpenAIEmbeddingAPI 的代理类，确保始终返回同一个实例"""
 
     def __new__(cls, *args, **kwargs):
         global _embedding_instance
         if _embedding_instance is None:
             with _embedding_lock:
                 if _embedding_instance is None:
-                    _embedding_instance = _QwenEmbeddingAPI(*args, **kwargs)
+                    _embedding_instance = _OpenAIEmbeddingAPI(*args, **kwargs)
         return _embedding_instance
