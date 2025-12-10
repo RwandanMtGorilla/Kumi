@@ -48,13 +48,6 @@ class Settings:
                                     ".pdf,.docx,.pptx,.xlsx,.xls,.txt,.md,.html,.csv,.wav,.mp3")
     MARKITDOWN_ALLOWED_EXTENSIONS: List[str] = [ext.strip() for ext in _allowed_extensions.split(",")]
 
-    # MySQL数据库配置
-    MYSQL_HOST: str = os.getenv("MYSQL_HOST", "some.sql.com")
-    MYSQL_PORT: int = int(os.getenv("MYSQL_PORT", "3306"))
-    MYSQL_USER: str = os.getenv("MYSQL_USER", "user")
-    MYSQL_PASSWORD: str = os.getenv("MYSQL_PASSWORD", "")
-    MYSQL_DATABASE: str = os.getenv("MYSQL_DATABASE", "")
-
     # Chroma向量数据库配置
     vector_db_type: str = os.getenv('VECTOR_DB_TYPE', 'chroma')
 
@@ -179,23 +172,6 @@ class Settings:
         print(f"   评测结果: {self.EVALUATION_RESULTS_PATH}")
         print(f"   YAML规则: {self.YAML_RULES_PATH}")
 
-    @property
-    def mysql_url(self) -> str:
-        """构建MySQL连接URL，使用正确的PyMySQL参数"""
-        # 对用户名和密码进行URL编码，处理特殊字符
-        encoded_user = quote_plus(self.MYSQL_USER)
-        encoded_password = quote_plus(self.MYSQL_PASSWORD)
-
-        # PyMySQL 连接参数 (转换自JDBC参数)
-        params = [
-            "charset=utf8mb4",  # 对应 characterEncoding=UTF-8
-            "use_unicode=1",  # 对应 useUnicode=true
-            "ssl_disabled=1",  # 对应 useSSL=false
-            "autocommit=0",  # 对应 autocommit=false
-            "sql_mode=TRADITIONAL"  # 严格模式
-        ]
-        param_string = "&".join(params)
-        return f"mysql+pymysql://{encoded_user}:{encoded_password}@{self.MYSQL_HOST}:{self.MYSQL_PORT}/{self.MYSQL_DATABASE}?{param_string}"
 
     @property
     def chroma_url(self) -> str:

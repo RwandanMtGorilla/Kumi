@@ -6,3 +6,4 @@
 /scripts/sql_scripts/logs/
 /storage/
 /output/
+/config/embedding_providers.yaml
