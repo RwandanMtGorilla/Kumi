@@ -111,7 +111,7 @@ uv pip install modelscope -i https://pypi.tuna.tsinghua.edu.cn/simple
 modelscope download --model Qwen/Qwen3-Embedding-0.6B --local_dir ./Qwen3-Embedding-0.6B
 
 # 这个部分只有一个代码 若修改模型 则执行本步骤前先修改代码配置
-uv run embedding_serve.py --model_path ./Qwen/Qwen3-Embedding-0.6B --model_name Qwen3-Embedding-0.6B
+uv run embedding_serve.py --model_path ./Qwen3-Embedding-0.6B --model_name Qwen3-Embedding-0.6B
 ```
 
 </details>
