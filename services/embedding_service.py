@@ -127,10 +127,18 @@ class EmbeddingService:
             {"success": bool, "message": str, "dimension": int}
         """
         try:
+            logger.info(f"开始测试embedding连接: provider={provider_name}, model={model_name}")
             client = self.get_client(provider_name, model_name)
-            return client.test_connection()
+            result = client.test_connection()
+
+            if result["success"]:
+                logger.info(f"Embedding连接测试成功: provider={provider_name}, model={model_name}, dimension={result['dimension']}")
+            else:
+                logger.warning(f"Embedding连接测试失败: provider={provider_name}, model={model_name}, reason={result['message']}")
+
+            return result
         except Exception as e:
-            logger.error(f"测试连接失败: {e}")
+            logger.error(f"测试连接时发生异常: provider={provider_name}, model={model_name}, error={e}", exc_info=True)
             return {
                 "success": False,
                 "message": f"测试连接失败: {str(e)}",

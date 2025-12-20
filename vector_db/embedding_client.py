@@ -55,32 +55,74 @@ class _OpenAIEmbeddingAPI:
 
     def test_connection(self):
         """
-        测试API连接(手动调用)
+        测试API连接(手动调用) - 通过实际调用embedding接口来测试
+
+        不再依赖/health端点，而是直接测试/v1/embeddings端点
+        这样可以同时验证连接性和获取embedding维度
 
         Returns:
             dict: {"success": bool, "message": str, "dimension": int}
         """
         try:
-            response = requests.get(f"{self.base_url}/health", timeout=10)
-            if response.status_code == 200:
-                health_status = response.text.strip('"')
-                # 获取维度
-                dimension = self._get_actual_embedding_dimension()
+            print("🔍 测试embedding API连接...")
+
+            # 使用一个简单的测试文本
+            test_text = "测试连接"
+
+            # 直接调用embedding接口进行测试
+            test_response = self._encode_single_batch([test_text], get_dimension=True)
+
+            # 检查返回结果
+            if test_response and len(test_response) > 0:
+                dimension = len(test_response[0])
+                print(f"✅ API连接测试成功，embedding维度: {dimension}")
                 return {
                     "success": True,
-                    "message": f"API连接成功: {health_status}",
+                    "message": f"API连接成功，embedding维度: {dimension}",
                     "dimension": dimension
                 }
             else:
+                print("❌ API返回了空结果")
                 return {
                     "success": False,
-                    "message": f"API健康检查失败: {response.status_code}",
+                    "message": "API返回了空结果，请检查模型配置",
                     "dimension": None
                 }
-        except Exception as e:
+
+        except requests.exceptions.ConnectionError as e:
+            # 连接错误（无法连接到服务器）
+            error_msg = f"无法连接到embedding服务 ({self.base_url}): {str(e)}"
+            print(f"❌ {error_msg}")
             return {
                 "success": False,
-                "message": f"API连接失败: {str(e)}",
+                "message": error_msg,
+                "dimension": None
+            }
+        except requests.exceptions.Timeout as e:
+            # 超时错误
+            error_msg = f"连接超时 (timeout={self.request_timeout}s)，请检查服务是否正常运行: {str(e)}"
+            print(f"❌ {error_msg}")
+            return {
+                "success": False,
+                "message": error_msg,
+                "dimension": None
+            }
+        except requests.exceptions.HTTPError as e:
+            # HTTP错误（4xx, 5xx）
+            error_msg = f"HTTP错误: {str(e)}"
+            print(f"❌ {error_msg}")
+            return {
+                "success": False,
+                "message": error_msg,
+                "dimension": None
+            }
+        except Exception as e:
+            # 其他未预期的错误
+            error_msg = f"测试连接时发生错误: {str(e)}"
+            print(f"❌ {error_msg}")
+            return {
+                "success": False,
+                "message": error_msg,
                 "dimension": None
             }
 
@@ -176,7 +218,19 @@ class _OpenAIEmbeddingAPI:
         return all_embeddings
 
     def _encode_single_batch(self, texts: List[str], get_dimension: bool = False) -> List[List[float]]:
-        """编码单个批次的文本"""
+        """
+        编码单个批次的文本
+
+        Args:
+            texts: 要编码的文本列表
+            get_dimension: 是否用于获取维度（测试连接时使用），为True时失败会抛出异常
+
+        Returns:
+            向量列表
+
+        Raises:
+            当get_dimension=True且失败时抛出异常
+        """
         payload = {
             "model": self.model,
             "input": texts,
@@ -184,6 +238,8 @@ class _OpenAIEmbeddingAPI:
         }
 
         max_retries = 5
+        last_error = None
+
         for attempt in range(max_retries):
             try:
                 start_time = time.time()
@@ -203,25 +259,49 @@ class _OpenAIEmbeddingAPI:
                     return embeddings
                 else:
                     error_msg = f"API请求失败: {response.status_code} - {response.text}"
+                    last_error = Exception(error_msg)
                     if attempt == max_retries - 1:
-                        raise Exception(error_msg)
+                        # 最后一次重试失败，抛出异常
+                        raise last_error
                     else:
                         print(f"      ⚠️ {error_msg}, 重试中... ({attempt + 1}/{max_retries})")
                         time.sleep(2 ** attempt)
 
-            except requests.exceptions.Timeout:
+            except requests.exceptions.Timeout as e:
+                last_error = e
                 if attempt == max_retries - 1:
-                    raise Exception("API请求超时")
+                    # 最后一次重试失败，抛出异常
+                    raise requests.exceptions.Timeout("API请求超时")
                 else:
                     print(f"      ⚠️ API请求超时，重试中... ({attempt + 1}/{max_retries})")
                     time.sleep(2 ** attempt)
+            except requests.exceptions.ConnectionError as e:
+                # 连接错误通常不需要重试，直接抛出
+                last_error = e
+                raise
+            except requests.exceptions.RequestException as e:
+                # 其他requests相关错误
+                last_error = e
+                if attempt == max_retries - 1:
+                    raise
+                else:
+                    print(f"      ⚠️ 请求异常: {e}, 重试中... ({attempt + 1}/{max_retries})")
+                    time.sleep(2 ** attempt)
             except Exception as e:
+                # 其他未预期的异常（如JSON解析错误）
+                last_error = e
                 if attempt == max_retries - 1:
                     raise Exception(f"API请求异常: {e}")
                 else:
                     print(f"      ⚠️ API请求异常: {e}, 重试中... ({attempt + 1}/{max_retries})")
                     time.sleep(2 ** attempt)
 
+        # 如果是测试连接（get_dimension=True），失败时抛出异常
+        if get_dimension and last_error:
+            print(f"      ❌ 批次编码失败")
+            raise last_error
+
+        # 正常向量化流程失败时返回零向量（容错处理）
         print(f"      ❌ 批次编码失败，返回零向量")
         fallback_dim = getattr(self, 'embedding_dim', 1024)
         return [[0.0] * fallback_dim for _ in texts]

@@ -595,6 +595,7 @@ async def test_embedding_connection(request: Request):
         model_identifier = data.get("model")  # "provider,model" 格式
 
         if not model_identifier:
+            logger.warning("测试embedding连接请求缺少模型标识符")
             return JSONResponse({
                 "status": "error",
                 "message": "请提供模型标识符"
@@ -604,6 +605,7 @@ async def test_embedding_connection(request: Request):
         try:
             provider, model = knowledge_service.embedding_service.parse_model_identifier(model_identifier)
         except Exception as e:
+            logger.warning(f"无效的模型标识符 '{model_identifier}': {e}")
             return JSONResponse({
                 "status": "error",
                 "message": f"无效的模型标识符: {str(e)}"
@@ -614,6 +616,7 @@ async def test_embedding_connection(request: Request):
         result = knowledge_service.embedding_service.test_connection(provider, model)
 
         if result["success"]:
+            logger.info(f"用户 {user.get('username', 'unknown')} 测试embedding连接成功: {provider},{model}, 维度: {result['dimension']}")
             return JSONResponse({
                 "status": "success",
                 "message": result["message"],
@@ -624,13 +627,14 @@ async def test_embedding_connection(request: Request):
                 }
             })
         else:
+            logger.warning(f"用户 {user.get('username', 'unknown')} 测试embedding连接失败: {provider},{model}, 原因: {result['message']}")
             return JSONResponse({
                 "status": "error",
                 "message": result["message"]
             }, status_code=500)
 
     except Exception as e:
-        logger.error(f"测试embedding连接失败: {e}")
+        logger.error(f"测试embedding连接时发生异常: {e}", exc_info=True)
         return JSONResponse({
             "status": "error",
             "message": f"测试连接失败: {str(e)}"
