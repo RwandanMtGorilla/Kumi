@@ -69,8 +69,11 @@ uv venv --python 3.12
 uv init
 uv pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
 
-# 生成.env (记得修改！)
+# 生成.env (也可以复制粘贴重命名) (修改 以配置登录用户名密码)
 cp settings/.env.example settings/.env
+
+# 生成 embedding_providers.yaml  (也可以复制粘贴重命名)(修改 以配置embedding服务使用)
+cp settings/embedding_providers.yaml.example settings/embedding_providers.yaml
 
 # 先等chroma和向量化 都启动了再执行这步
 uv run scripts/start_dev.py
@@ -93,6 +96,7 @@ chroma run --path storage/testdb --port 8081 --host 127.0.0.1
 ```
 
 ### 向量化API
+如果有云端的API 则无需执行本步骤 在`embedding_providers.yaml`中配置即可
 ```sh
 # 为向量化服务创建独立环境（可选）
 uv venv --python 3.12

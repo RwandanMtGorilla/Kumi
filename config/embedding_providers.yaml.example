@@ -1,7 +1,7 @@
 Providers:
 
   - name: local # 填个你认得出的供应商名称 和 default中的供应商名对应
-    api_base_url: http://127.0.0.1:8504
+    api_base_url: http://127.0.0.1:8504 # 填api地址 /v1和后面舍去
     api_key: 123
     models:
       - Qwen3-Embedding-0.6B
@@ -16,5 +16,5 @@ Providers:
 
 
 
-Router: # 默认使用的模型
+Router: # 默认使用的模型 语法:供应商名,模型名 示例如下
   default: local,Qwen3-Embedding-0.6B
