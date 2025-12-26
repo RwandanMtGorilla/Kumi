@@ -125,7 +125,7 @@ uv run embedding_serve.py --model_path ./Qwen3-Embedding-0.6B --model_name Qwen3
 <summary><strong>👉 点击展开：讨论群</strong></summary>
 <br>
 
-![讨论群二维码](images/20251216-094010.jpg)
+![讨论群二维码](images/20251226-101625.jpg)
 
 </details>
 
