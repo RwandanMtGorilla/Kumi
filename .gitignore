@@ -7,3 +7,7 @@
 /storage/
 /output/
 /config/embedding_providers.yaml
+/.idea/
+/scripts/md2qa/input/
+/scripts/md2qa/output/
+/scripts/md2qa/QA/
