@@ -424,7 +424,56 @@
 
 .pagination-controls {
     display: flex;
+    align-items: center;
     gap: 10px;
+}
+
+/* 页码按钮容器 */
+.page-numbers {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.page-num-btn {
+    min-width: 32px;
+    height: 28px;
+    padding: 0 6px;
+    border: 1px solid #e5e7eb;
+    background: #fff;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.8rem;
+    color: #6b7280;
+    transition: all 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.page-num-btn:hover:not(:disabled) {
+    border-color: #6666FF;
+    color: #6666FF;
+}
+
+.page-num-btn.active {
+    background: #6666FF;
+    border-color: #6666FF;
+    color: #fff;
+    cursor: default;
+    font-weight: 600;
+}
+
+.page-ellipsis {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 24px;
+    height: 28px;
+    color: #9ca3af;
+    font-size: 0.8rem;
+    user-select: none;
+    letter-spacing: 1px;
 }
 
 /* 每页行数选择器 */

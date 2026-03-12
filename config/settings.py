@@ -43,6 +43,9 @@ class Settings:
     MARKITDOWN_ENABLE_PLUGINS: bool = os.getenv("MARKITDOWN_ENABLE_PLUGINS", "false").lower() == "true"
     MARKITDOWN_MAX_FILE_SIZE: int = int(os.getenv("MARKITDOWN_MAX_FILE_SIZE", str(50 * 1024 * 1024)))  # 50MB
 
+    # 知识库上传文件大小限制
+    KNOWLEDGE_UPLOAD_MAX_FILE_SIZE: int = int(os.getenv("KNOWLEDGE_UPLOAD_MAX_FILE_SIZE", str(100 * 1024 * 1024)))  # 100MB
+
     # 支持的文件扩展名（从环境变量读取，用逗号分隔）
     _allowed_extensions = os.getenv("MARKITDOWN_ALLOWED_EXTENSIONS",
                                     ".pdf,.docx,.pptx,.xlsx,.xls,.txt,.md,.html,.csv,.wav,.mp3")
@@ -96,6 +99,13 @@ class Settings:
     DEFAULT_MAX_TOKENS: int = int(os.getenv("DEFAULT_MAX_TOKENS", "1000"))
 
     API_API_KEY: Optional[str] = os.getenv("API_API_KEY")
+
+    # KUMI API URL（用于 UMAP 可视化服务调用主服务）
+    KUMI_API_URL: str = os.getenv("KUMI_API_URL", "http://localhost:8000")
+
+    # UMAP 缓存目录（Embedding Atlas 兼容格式）
+    _UMAP_CACHE_DIR: Optional[str] = os.getenv("UMAP_CACHE_DIR")
+
     # 日志配置
     LOG_LEVEL: str = os.getenv("LOG_LEVEL", "INFO")
     LOG_FILE: Optional[str] = os.getenv("LOG_FILE")
@@ -192,6 +202,30 @@ class Settings:
     def EMBEDDING_CONFIG_PATH(self) -> str:
         """获取embedding配置文件完整路径"""
         return str(Path(self.PROJECT_ROOT) / self._EMBEDDING_CONFIG_PATH)
+
+    @property
+    def UMAP_CACHE_DIR(self) -> str:
+        """
+        获取 UMAP 缓存目录（Embedding Atlas 兼容格式）
+
+        默认值按平台:
+        - Windows: %LOCALAPPDATA%\\embedding_atlas\\projections\\
+        - Linux: ~/.cache/embedding_atlas/projections/
+        - macOS: ~/Library/Caches/embedding_atlas/projections/
+        """
+        if self._UMAP_CACHE_DIR:
+            return self._UMAP_CACHE_DIR
+
+        import sys
+        if sys.platform == 'win32':
+            local_app_data = os.environ.get('LOCALAPPDATA', '')
+            if local_app_data:
+                return str(Path(local_app_data) / 'embedding_atlas' / 'projections')
+            return str(Path.home() / 'AppData' / 'Local' / 'embedding_atlas' / 'projections')
+        elif sys.platform == 'darwin':
+            return str(Path.home() / 'Library' / 'Caches' / 'embedding_atlas' / 'projections')
+        else:
+            return str(Path.home() / '.cache' / 'embedding_atlas' / 'projections')
 
     def get_embedding_config(self) -> 'EmbeddingConfig':
         """

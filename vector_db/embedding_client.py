@@ -18,7 +18,7 @@ class _OpenAIEmbeddingAPI:
         # 使用新配置系统获取配置,允许通过参数覆盖
         self.base_url = (base_url or (model_info.get("api_base_url") if model_info else "")).rstrip('/')
         self.token = token or (model_info.get("api_key") if model_info else "")
-        self.model = model or f"{provider_name},{model_name}"
+        self.model = model or (model_info.get("model") if model_info else model_name)
         self.headers = {
             "Authorization": f"Bearer {self.token}",
             "Content-Type": "application/json"
@@ -143,7 +143,7 @@ class _OpenAIEmbeddingAPI:
             return 1024
 
     def encode_texts(self, texts: List[str]) -> List[List[float]]:
-        """批量编码文本为向量"""
+        """批量编码文本为向量（带批次级降级）"""
         self._lazy_init()
         if not texts:
             return []
@@ -158,19 +158,37 @@ class _OpenAIEmbeddingAPI:
             batch_num = i // self.max_batch_size + 1
 
             print(f"   处理批次 {batch_num}/{total_batches} ({len(batch_texts)} 个文本)")
-            batch_embeddings = self._encode_single_batch(batch_texts)
-            all_embeddings.extend(batch_embeddings)
+
+            try:
+                # 尝试批量编码
+                batch_embeddings = self._encode_single_batch(batch_texts)
+                all_embeddings.extend(batch_embeddings)
+            except Exception as batch_error:
+                # 批量失败，降级为逐条处理（仅对当前批次）
+                print(f"      ⚠️ 批次 {batch_num} 批量编码失败: {batch_error}，降级为逐条处理")
+
+                for j, text in enumerate(batch_texts):
+                    try:
+                        single_embedding = self._encode_single_batch([text])
+                        all_embeddings.append(single_embedding[0])
+                    except Exception as single_error:
+                        # 单条也失败，使用 None 占位
+                        print(f"        ❌ 批次 {batch_num} 文本 {j+1}/{len(batch_texts)} 编码失败: {single_error}")
+                        all_embeddings.append(None)
 
             if i + self.max_batch_size < len(texts):
                 time.sleep(0.2)
 
-        print(f"✅ 批量向量化完成: 共处理 {len(all_embeddings)} 个向量")
+        success_count = sum(1 for e in all_embeddings if e is not None)
+        fail_count = len(all_embeddings) - success_count
+        print(f"✅ 批量向量化完成: 成功 {success_count} 个，失败 {fail_count} 个")
+
         return all_embeddings
 
     def encode_texts_with_progress(self, texts: List[str],
                                    progress_callback: Optional[Callable[[int, int, str], None]] = None) -> List[
         List[float]]:
-        """批量编码文本为向量（带进度回调的新方法）"""
+        """批量编码文本为向量（带进度回调和批次级降级）"""
         self._lazy_init()
         if not texts:
             return []
@@ -196,10 +214,25 @@ class _OpenAIEmbeddingAPI:
             print(f"   处理批次 {batch_num}/{total_batches} ({len(batch_texts)} 个文本)")
 
             start_time = time.time()
-            batch_embeddings = self._encode_single_batch(batch_texts)
-            end_time = time.time()
 
-            all_embeddings.extend(batch_embeddings)
+            try:
+                # 尝试批量编码
+                batch_embeddings = self._encode_single_batch(batch_texts)
+                all_embeddings.extend(batch_embeddings)
+            except Exception as batch_error:
+                # 批量失败，降级为逐条处理（仅对当前批次）
+                print(f"      ⚠️ 批次 {batch_num} 批量编码失败: {batch_error}，降级为逐条处理")
+
+                for j, text in enumerate(batch_texts):
+                    try:
+                        single_embedding = self._encode_single_batch([text])
+                        all_embeddings.append(single_embedding[0])
+                    except Exception as single_error:
+                        # 单条也失败，使用 None 占位
+                        print(f"        ❌ 批次 {batch_num} 文本 {j+1}/{len(batch_texts)} 编码失败: {single_error}")
+                        all_embeddings.append(None)
+
+            end_time = time.time()
 
             # 批次完成回调
             if progress_callback:
@@ -209,11 +242,14 @@ class _OpenAIEmbeddingAPI:
             if i + self.max_batch_size < len(texts):
                 time.sleep(0.2)
 
-        print(f"✅ 批量向量化完成: 共处理 {len(all_embeddings)} 个向量")
+        # 统计成功/失败
+        success_count = sum(1 for e in all_embeddings if e is not None)
+        fail_count = len(all_embeddings) - success_count
+        print(f"✅ 批量向量化完成: 成功 {success_count} 个，失败 {fail_count} 个")
 
         # 最终完成回调
         if progress_callback:
-            progress_callback(total_batches, total_batches, f"向量化完成，共处理 {len(all_embeddings)} 个向量")
+            progress_callback(total_batches, total_batches, f"向量化完成，成功 {success_count} 个，失败 {fail_count} 个")
 
         return all_embeddings
 
@@ -296,15 +332,9 @@ class _OpenAIEmbeddingAPI:
                     print(f"      ⚠️ API请求异常: {e}, 重试中... ({attempt + 1}/{max_retries})")
                     time.sleep(2 ** attempt)
 
-        # 如果是测试连接（get_dimension=True），失败时抛出异常
-        if get_dimension and last_error:
-            print(f"      ❌ 批次编码失败")
-            raise last_error
-
-        # 正常向量化流程失败时返回零向量（容错处理）
-        print(f"      ❌ 批次编码失败，返回零向量")
-        fallback_dim = getattr(self, 'embedding_dim', 1024)
-        return [[0.0] * fallback_dim for _ in texts]
+        # 所有重试失败后抛出异常，让调用者决定如何处理
+        print(f"      ❌ 批次编码失败，已达最大重试次数")
+        raise last_error or Exception("批次编码失败，已达最大重试次数")
 
 
 # 模块级单例实例

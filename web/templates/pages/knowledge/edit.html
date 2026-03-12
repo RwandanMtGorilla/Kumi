@@ -67,6 +67,7 @@
                 <button class="btn btn-sm" id="prevPageBtn" onclick="prevPage()" disabled>
                     <i class="bi bi-chevron-left"></i> 上一页
                 </button>
+                <div class="page-numbers" id="pageNumbers"></div>
                 <button class="btn btn-sm" id="nextPageBtn" onclick="nextPage()" disabled>
                     下一页 <i class="bi bi-chevron-right"></i>
                 </button>
@@ -505,6 +506,75 @@
 
         document.getElementById('prevPageBtn').disabled = currentPage <= 1;
         document.getElementById('nextPageBtn').disabled = currentPage >= totalPages;
+
+        renderPaginationButtons();
+    }
+
+    function generatePageNumbers(current, total) {
+        if (total <= 7) {
+            return Array.from({length: total}, (_, i) => i + 1);
+        }
+
+        const pages = new Set();
+
+        pages.add(1);
+        pages.add(2);
+        pages.add(total - 1);
+        pages.add(total);
+
+        let segStart = current - 1;
+        let segEnd = current + 1;
+
+        if (segStart < 1) {
+            segEnd += (1 - segStart);
+            segStart = 1;
+        }
+        if (segEnd > total) {
+            segStart -= (segEnd - total);
+            segEnd = total;
+        }
+        segStart = Math.max(1, segStart);
+
+        for (let i = segStart; i <= segEnd; i++) {
+            pages.add(i);
+        }
+
+        const sorted = Array.from(pages).sort((a, b) => a - b);
+        const result = [];
+        for (let i = 0; i < sorted.length; i++) {
+            if (i > 0 && sorted[i] - sorted[i - 1] > 1) {
+                result.push('...');
+            }
+            result.push(sorted[i]);
+        }
+
+        return result;
+    }
+
+    function renderPaginationButtons() {
+        const container = document.getElementById('pageNumbers');
+        if (!container) return;
+
+        if (totalPages <= 1) {
+            container.innerHTML = '';
+            return;
+        }
+
+        const pages = generatePageNumbers(currentPage, totalPages);
+
+        container.innerHTML = pages.map(item => {
+            if (item === '...') {
+                return '<span class="page-ellipsis">...</span>';
+            }
+            const isActive = item === currentPage;
+            return `<button class="page-num-btn${isActive ? ' active' : ''}" onclick="goToPage(${item})" ${isActive ? 'disabled' : ''}>${item}</button>`;
+        }).join('');
+    }
+
+    function goToPage(page) {
+        if (page < 1 || page > totalPages || page === currentPage) return;
+        currentPage = page;
+        loadDocuments();
     }
 
     function prevPage() {

@@ -604,7 +604,7 @@
             </div>
             <h4>点击或拖拽文件到此处</h4>
             <p>支持 Excel (.xlsx, .xls)、CSV (.csv)、JSON (.json) 格式</p>
-            <p>文件大小限制: 50MB</p>
+            <p>文件大小限制: {{ max_file_size_mb }}MB</p>
             <input type="file" id="fileInput" accept=".xlsx,.xls,.csv,.json" style="display: none;">
         </div>
 
@@ -635,6 +635,33 @@
     <!-- 步骤3: 配置参数 - 修改这个部分 -->
     <div class="upload-section" id="section3">
         <h3>步骤 3: 配置向量化参数</h3>
+
+        <!-- 增量上传选项 - 移动到顶部 -->
+        <div class="form-group" id="incrementalUploadGroup" style="margin-bottom: 20px; padding-bottom: 15px; border-bottom: 1px solid #e5e7eb;">
+            <label class="form-label" style="display: flex; align-items: center; cursor: pointer;">
+                <input type="checkbox" id="enableIncremental" style="margin-right: 8px; width: 16px; height: 16px;">
+                <span>增量上传（追加到已有知识库）</span>
+            </label>
+            <small style="color: #6b7280; display: block; margin-top: 4px;">
+                勾选后可选择已有知识库进行增量上传，系统将自动跳过重复内容
+            </small>
+        </div>
+
+        <!-- Collection 选择器 - 增量上传时显示下拉框 -->
+        <div class="form-group" id="collectionSelectGroup" style="display: none; margin-bottom: 20px;">
+            <label class="form-label" for="collectionSelect">选择目标知识库:</label>
+            <select id="collectionSelect" class="form-select" style="width: 100%;">
+                <option value="">加载中...</option>
+            </select>
+            <small style="color: #6b7280;">
+                选择要追加数据的已有知识库
+            </small>
+            <!-- 模板不一致警告 -->
+            <div id="templateWarning" class="alert" style="display: none; margin-top: 10px; background: #fef3c7; border: 1px solid #f59e0b; border-radius: 6px; padding: 12px;">
+                <strong style="color: #92400e;">⚠ 警告：</strong><span style="color: #92400e;">当前模板与知识库已有模板不一致，可能影响检索效果</span>
+                <div id="templateWarningDetail" style="font-size: 12px; margin-top: 8px; color: #78350f;"></div>
+            </div>
+        </div>
 
         <div class="form-group">
             <label class="form-label">选择Embedding模板:</label>
@@ -716,6 +743,47 @@
             </small>
         </div>
 
+        <div class="form-group">
+            <label class="form-label" for="insertBatchMultiplier">数据库插入倍率:</label>
+            <input type="number" id="insertBatchMultiplier" class="form-input"
+                   value="10" min="1" max="100" required>
+            <small style="color: #6b7280;">
+                数据库每批次插入记录数 = 批处理大小 × 插入倍率。增大倍率可减少网络往返，提高插入效率
+            </small>
+        </div>
+
+        <div class="form-group" id="dedupFieldGroup" style="display: none; margin-top: 20px; padding-top: 15px; border-top: 1px solid #e5e7eb;">
+            <label class="form-label" for="dedupMethod">去重方式:</label>
+            <select id="dedupMethod" class="form-input" style="width: 100%;">
+                <option value="hash" selected>基于内容（Document Hash）</option>
+                <option value="field">指定唯一字段</option>
+            </select>
+            <small style="color: #6b7280;">
+                "基于内容"：比较 Document 模板生成的完整文本；"指定唯一字段"：使用某个字段（如ID）作为唯一标识
+            </small>
+        </div>
+
+        <div class="form-group" id="dedupFieldSelectGroup" style="display: none; margin-top: 10px;">
+            <label class="form-label" for="dedupField">选择去重字段:</label>
+            <select id="dedupField" class="form-input" style="width: 100%;">
+                <!-- 字段列表将动态生成 -->
+            </select>
+            <small style="color: #6b7280;">
+                选择文件中用于唯一标识每条记录的字段
+            </small>
+        </div>
+
+        <!-- 列更新选项 - 仅在增量上传且存在id列时显示 -->
+        <div class="form-group" id="columnUpdateGroup" style="display: none; margin-top: 10px;">
+            <label class="form-label" style="display: flex; align-items: center; cursor: pointer;">
+                <input type="checkbox" id="enableColumnUpdate" style="margin-right: 8px; width: 16px; height: 16px;">
+                <span>启用列更新</span>
+            </label>
+            <small style="color: #6b7280;">
+                以 <code>id</code> 列匹配已有记录。匹配时更新 metadata（不重新向量化），不匹配则作为新记录插入。
+            </small>
+        </div>
+
         <div style="text-align: right; margin-top: 20px;">
             <button class="btn btn-secondary" id="backToPreviewBtn">返回预览</button>
             <button class="btn btn-primary" id="startProcessBtn" style="margin-left: 10px;">开始处理</button>
@@ -761,6 +829,10 @@
     let embeddingModels = [];
     let defaultEmbeddingModel = null;
 
+    // 新增：Collection 相关全局变量
+    let collectionsCache = [];  // 缓存已有 Collection 列表
+    let selectedCollectionMetadata = null;  // 选中 Collection 的 metadata
+
     // DOM元素
     const fileDropZone = document.getElementById('fileDropZone');
     const fileInput = document.getElementById('fileInput');
@@ -782,6 +854,7 @@
         initializeEventListeners();
         loadTemplates();
         loadEmbeddingModels();
+        loadCollections();  // 新增：预加载 Collections 列表
     });
 
     function initializeEventListeners() {
@@ -841,6 +914,11 @@
             validateTemplateFields();
             calculateBatchSize();
             this.oldValue = this.value;
+
+            // 新增：检查模板一致性（增量上传时）
+            if (document.getElementById('enableIncremental').checked) {
+                checkTemplateConsistency();
+            }
         });
 
         documentTemplate.addEventListener('input', function() {
@@ -849,7 +927,233 @@
 
         // 批处理大小默认值
         batchSize.value = '20';
+
+        // 增量上传选项事件 - 重新实现
+        document.getElementById('enableIncremental').addEventListener('change', function() {
+            const isIncremental = this.checked;
+            const collectionSelectGroup = document.getElementById('collectionSelectGroup');
+            const collectionNameGroup = document.getElementById('collectionName').parentElement;
+            const dedupFieldGroup = document.getElementById('dedupFieldGroup');
+            const dedupFieldSelectGroup = document.getElementById('dedupFieldSelectGroup');
+
+            if (isIncremental) {
+                // 显示下拉框，隐藏输入框
+                collectionSelectGroup.style.display = 'block';
+                collectionNameGroup.style.display = 'none';
+                dedupFieldGroup.style.display = 'block';
+
+                // 填充下拉框选项
+                populateCollectionSelect();
+
+                // 根据去重方式显示字段选择
+                if (document.getElementById('dedupMethod').value === 'field') {
+                    dedupFieldSelectGroup.style.display = 'block';
+                }
+            } else {
+                // 显示输入框，隐藏下拉框
+                collectionSelectGroup.style.display = 'none';
+                collectionNameGroup.style.display = 'block';
+                dedupFieldGroup.style.display = 'none';
+                dedupFieldSelectGroup.style.display = 'none';
+
+                // 清除警告和选中状态
+                hideTemplateWarning();
+                selectedCollectionMetadata = null;
+            }
+
+            // 检查列更新可用性
+            checkColumnUpdateAvailability();
+        });
+
+        // 列更新选项事件 - 勾选时自动设置去重方式为 field 且字段为 id
+        document.getElementById('enableColumnUpdate').addEventListener('change', function() {
+            if (this.checked) {
+                // 自动选择"指定唯一字段"方式
+                document.getElementById('dedupMethod').value = 'field';
+                document.getElementById('dedupFieldSelectGroup').style.display = 'block';
+                // 自动选择 id 字段
+                document.getElementById('dedupField').value = 'id';
+            }
+        });
+
+        // Collection 选择变化事件
+        document.getElementById('collectionSelect').addEventListener('change', async function() {
+            const selectedName = this.value;
+
+            if (!selectedName) {
+                hideTemplateWarning();
+                selectedCollectionMetadata = null;
+                return;
+            }
+
+            try {
+                // 获取 Collection 的 metadata
+                const response = await fetch(`/web/api/knowledge/collections/${encodeURIComponent(selectedName)}/metadata`);
+                const result = await response.json();
+
+                if (result.status === 'success') {
+                    selectedCollectionMetadata = result.data.metadata;
+
+                    // 填充模板到自定义模板框
+                    if (selectedCollectionMetadata.embedding_template) {
+                        customTemplate.value = selectedCollectionMetadata.embedding_template;
+
+                        // 清除模板卡片选中状态
+                        clearTemplateSelection();
+
+                        // 如果高级配置启用，也填充 document 模板
+                        if (advancedConfigEnabled && selectedCollectionMetadata.document_template) {
+                            documentTemplate.value = selectedCollectionMetadata.document_template;
+                        } else if (!advancedConfigEnabled) {
+                            documentTemplate.value = selectedCollectionMetadata.embedding_template;
+                        }
+
+                        // 验证字段并计算批处理大小
+                        validateTemplateFields();
+                        calculateBatchSize();
+                    }
+
+                    // 检查模板一致性（初始时隐藏警告，因为刚刚填充的模板是一致的）
+                    hideTemplateWarning();
+
+                    // 更新 collection 名称（用于提交）
+                    collectionName.value = selectedName;
+                }
+            } catch (error) {
+                console.error('获取 Collection metadata 失败:', error);
+                showAlert('error', '获取知识库信息失败');
+            }
+        });
+
+        document.getElementById('dedupMethod').addEventListener('change', function() {
+            const dedupFieldSelectGroup = document.getElementById('dedupFieldSelectGroup');
+            if (this.value === 'field') {
+                dedupFieldSelectGroup.style.display = 'block';
+                // 动态填充字段选项
+                populateDedupFieldOptions();
+            } else {
+                dedupFieldSelectGroup.style.display = 'none';
+            }
+        });
     }
+
+    // 填充去重字段选项
+    function populateDedupFieldOptions() {
+        const dedupFieldSelect = document.getElementById('dedupField');
+        dedupFieldSelect.innerHTML = '';
+
+        if (previewData && previewData.columns) {
+            previewData.columns.forEach(column => {
+                const option = document.createElement('option');
+                option.value = column;
+                option.textContent = column;
+                dedupFieldSelect.appendChild(option);
+            });
+        }
+    }
+
+    // ============ 新增：Collection 相关函数 ============
+
+    // 加载已有 Collections 列表
+    async function loadCollections() {
+        try {
+            const response = await fetch('/web/api/knowledge/collections');
+            const result = await response.json();
+
+            if (result.status === 'success') {
+                collectionsCache = result.data.collections || [];
+                console.log(`已加载 ${collectionsCache.length} 个 Collections`);
+            }
+        } catch (error) {
+            console.error('加载 Collections 失败:', error);
+        }
+    }
+
+    // 填充 Collection 下拉框
+    function populateCollectionSelect() {
+        const select = document.getElementById('collectionSelect');
+
+        if (collectionsCache.length === 0) {
+            select.innerHTML = '<option value="">暂无可用知识库</option>';
+            return;
+        }
+
+        select.innerHTML = '<option value="">请选择知识库...</option>' +
+            collectionsCache.map(col =>
+                `<option value="${col.name}" data-count="${col.document_count}">${col.name} (${col.document_count} 条)</option>`
+            ).join('');
+    }
+
+    // 检查模板一致性
+    function checkTemplateConsistency() {
+        if (!selectedCollectionMetadata) return;
+
+        const currentEmbeddingTemplate = customTemplate.value.trim();
+        const savedEmbeddingTemplate = selectedCollectionMetadata.embedding_template || '';
+
+        if (currentEmbeddingTemplate && savedEmbeddingTemplate &&
+            currentEmbeddingTemplate !== savedEmbeddingTemplate) {
+            showTemplateWarning(savedEmbeddingTemplate, currentEmbeddingTemplate);
+        } else {
+            hideTemplateWarning();
+        }
+    }
+
+    // 显示模板警告
+    function showTemplateWarning(savedTemplate, currentTemplate) {
+        const warningDiv = document.getElementById('templateWarning');
+        const detailDiv = document.getElementById('templateWarningDetail');
+
+        detailDiv.innerHTML = `
+            <div style="margin-bottom: 4px;"><strong>知识库模板:</strong> <code style="background: rgba(0,0,0,0.1); padding: 2px 6px; border-radius: 3px;">${savedTemplate}</code></div>
+            <div><strong>当前模板:</strong> <code style="background: rgba(0,0,0,0.1); padding: 2px 6px; border-radius: 3px;">${currentTemplate}</code></div>
+        `;
+        warningDiv.style.display = 'block';
+
+        // 同时给自定义模板框添加黄色边框
+        customTemplate.style.borderColor = '#f59e0b';
+        customTemplate.style.backgroundColor = '#fffbeb';
+    }
+
+    // 隐藏模板警告
+    function hideTemplateWarning() {
+        document.getElementById('templateWarning').style.display = 'none';
+
+        // 恢复自定义模板框样式
+        customTemplate.style.borderColor = '';
+        customTemplate.style.backgroundColor = '';
+    }
+
+    // 自动匹配 Collection（根据文件名）
+    function autoMatchCollection(filename) {
+        if (collectionsCache.length === 0) return;
+
+        // 遍历所有 Collection，检查 source_files 是否包含该文件名
+        for (const col of collectionsCache) {
+            const sourceFiles = col.source_files || [];
+
+            if (sourceFiles.includes(filename)) {
+                // 自动勾选增量上传
+                const enableIncrementalCheckbox = document.getElementById('enableIncremental');
+                enableIncrementalCheckbox.checked = true;
+                enableIncrementalCheckbox.dispatchEvent(new Event('change'));
+
+                // 选中匹配的 Collection
+                setTimeout(() => {
+                    const collectionSelect = document.getElementById('collectionSelect');
+                    collectionSelect.value = col.name;
+                    collectionSelect.dispatchEvent(new Event('change'));
+
+                    // 提示用户
+                    showTemporaryMessage(`已自动匹配到知识库: ${col.name}`, 'info');
+                }, 100);
+
+                break;
+            }
+        }
+    }
+
+    // ============ 新增函数结束 ============
 
     function handleDragOver(e) {
         e.preventDefault();
@@ -887,15 +1191,19 @@
         }
 
         // 验证文件大小
-        const maxSize = 50 * 1024 * 1024; // 50MB
+        const maxSize = {{ max_file_size_bytes }}; // {{ max_file_size_mb }}MB
+        const maxSizeMB = {{ max_file_size_mb }};
         if (selectedFile.size > maxSize) {
-            showAlert('error', `文件太大，限制为50MB，当前文件: ${(selectedFile.size / 1024 / 1024).toFixed(1)}MB`);
+            showAlert('error', `文件太大，限制为${maxSizeMB}MB，当前文件: ${(selectedFile.size / 1024 / 1024).toFixed(1)}MB`);
             return;
         }
 
         // 显示文件信息
         showFileInfo();
         previewBtn.disabled = false;
+
+        // 新增：自动匹配 Collection
+        autoMatchCollection(selectedFile.name);
     }
 
     function showFileInfo() {
@@ -1000,8 +1308,37 @@
             validateTemplateFields();
             calculateBatchSize();
         }, 100);
+
+        // 检查列更新可用性
+        checkColumnUpdateAvailability();
     }
 
+    // 检查列更新功能是否可用（需要有 id 列且启用增量上传）
+    function checkColumnUpdateAvailability() {
+        const hasIdColumn = previewData && previewData.columns && previewData.columns.includes('id');
+        const isIncremental = document.getElementById('enableIncremental').checked;
+        const columnUpdateGroup = document.getElementById('columnUpdateGroup');
+        const enableColumnUpdate = document.getElementById('enableColumnUpdate');
+
+        if (hasIdColumn && isIncremental) {
+            columnUpdateGroup.style.display = 'block';
+            // 填充去重字段下拉框（确保 id 在选项中）
+            populateDedupFieldSelect();
+        } else {
+            columnUpdateGroup.style.display = 'none';
+            enableColumnUpdate.checked = false;
+        }
+    }
+
+    // 填充去重字段下拉框
+    function populateDedupFieldSelect() {
+        const dedupField = document.getElementById('dedupField');
+        if (previewData && previewData.columns) {
+            dedupField.innerHTML = previewData.columns.map(col =>
+                `<option value="${col}">${col}</option>`
+            ).join('');
+        }
+    }
 
     // 更新可用字段为按钮
     function updateAvailableFields(columns) {
@@ -1350,10 +1687,32 @@
     async function startProcessing() {
         const embeddingTemplate = customTemplate.value.trim();
         const docTemplate = documentTemplate.value.trim();
-        const collection = collectionName.value.trim();
         const batch = parseInt(batchSize.value);
         const workers = parseInt(document.getElementById('numWorkers').value);
         const selectedModel = embeddingModel.value;
+        const isIncremental = document.getElementById('enableIncremental').checked;
+
+        // 根据增量上传状态获取 collection 名称
+        let collection;
+        if (isIncremental) {
+            collection = document.getElementById('collectionSelect').value;
+            if (!collection) {
+                showAlert('error', '请选择目标知识库');
+                return;
+            }
+        } else {
+            collection = collectionName.value.trim();
+            if (!collection) {
+                showAlert('error', '请输入collection名称');
+                return;
+            }
+
+            const validation = validateCollectionName(collection);
+            if (!validation.valid) {
+                showAlert('error', validation.message);
+                return;
+            }
+        }
 
         // 验证参数
         if (!embeddingTemplate) {
@@ -1371,17 +1730,6 @@
             return;
         }
 
-        if (!collection) {
-            showAlert('error', '请输入collection名称');
-            return;
-        }
-
-        const validation = validateCollectionName(collection);
-        if (!validation.valid) {
-            showAlert('error', validation.message);
-            return;
-        }
-
         if (batch < 1 || batch > 1000) {
             showAlert('error', '批处理大小必须在1-1000之间');
             return;
@@ -1389,6 +1737,12 @@
 
         if (workers < 1 || workers > 16) {
             showAlert('error', '并发Worker数必须在1-16之间');
+            return;
+        }
+
+        const insertMultiplier = parseInt(document.getElementById('insertBatchMultiplier').value);
+        if (insertMultiplier < 1 || insertMultiplier > 100) {
+            showAlert('error', '数据库插入倍率必须在1-100之间');
             return;
         }
 
@@ -1403,7 +1757,23 @@
             formData.append('collection_name', collection);
             formData.append('batch_size', batch);
             formData.append('num_workers', workers);
+            formData.append('insert_batch_multiplier', insertMultiplier);
             formData.append('embedding_model', selectedModel);
+
+            // 增量上传参数（使用前面已定义的 isIncremental 变量）
+            formData.append('enable_incremental', isIncremental);
+
+            // 去重字段（仅在选择"指定唯一字段"时传递）
+            if (isIncremental && document.getElementById('dedupMethod').value === 'field') {
+                const dedupField = document.getElementById('dedupField').value;
+                if (dedupField) {
+                    formData.append('dedup_field', dedupField);
+                }
+            }
+
+            // 列更新参数
+            const enableColumnUpdate = document.getElementById('enableColumnUpdate').checked;
+            formData.append('enable_column_update', enableColumnUpdate);
 
             // 创建任务
             const response = await fetch('/web/api/knowledge/upload/process', {
@@ -1532,9 +1902,80 @@
     }
 
     function showSuccessResult(data) {
+        // 计算是否有增量上传相关的统计
+        const hasIncrementalStats = data.skipped_duplicates !== undefined;
+        const hasColumnUpdate = data.updated_records !== undefined && data.updated_records > 0;
+        const hasFailedRecords = (data.embedding_failed_count || 0) + (data.storage_failed_count || 0) > 0;
+
+        // 构建增量上传统计HTML
+        let incrementalStatsHtml = '';
+        if (hasIncrementalStats || hasColumnUpdate) {
+            incrementalStatsHtml = `
+                <div class="result-item" style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #e5e7eb;">
+                    <span><strong>跳过重复记录:</strong></span>
+                    <span style="color: ${data.skipped_duplicates > 0 ? '#f59e0b' : '#10b981'};">${data.skipped_duplicates || 0}</span>
+                </div>
+            `;
+            if (hasColumnUpdate) {
+                incrementalStatsHtml += `
+                    <div class="result-item">
+                        <span><strong>列更新记录:</strong></span>
+                        <span style="color: #3b82f6; font-weight: bold;">${data.updated_records}</span>
+                    </div>
+                `;
+            }
+        }
+
+        // 构建失败记录统计HTML
+        let failedStatsHtml = '';
+        if (hasFailedRecords) {
+            failedStatsHtml = `
+                <div class="result-item">
+                    <span><strong>向量化失败:</strong></span>
+                    <span style="color: #ef4444;">${data.embedding_failed_count || 0}</span>
+                </div>
+                <div class="result-item">
+                    <span><strong>存储失败:</strong></span>
+                    <span style="color: #ef4444;">${data.storage_failed_count || 0}</span>
+                </div>
+            `;
+        }
+
+        // 构建失败记录详情HTML
+        let failedRecordsHtml = '';
+        if (data.failed_records && data.failed_records.length > 0) {
+            const failedRecordsListHtml = data.failed_records.slice(0, 10).map((record, index) => `
+                <div style="padding: 8px; background: #fef2f2; border-radius: 4px; margin-bottom: 8px; font-size: 0.9em;">
+                    <strong>行 ${record.row_index + 1}:</strong> ${record.reason} - ${record.error}
+                </div>
+            `).join('');
+
+            const moreRecordsHtml = data.total_failed_records > 10
+                ? `<p style="color: #6b7280; font-size: 0.9em;">... 以及其他 ${data.total_failed_records - 10} 条失败记录</p>`
+                : '';
+
+            failedRecordsHtml = `
+                <div style="margin-top: 20px;">
+                    <h4 style="color: #ef4444; cursor: pointer;" onclick="toggleFailedRecords()">
+                        ⚠ 失败记录详情 <span id="failedRecordsToggle">(点击展开)</span>
+                    </h4>
+                    <div id="failedRecordsList" style="display: none; margin-top: 10px;">
+                        ${failedRecordsListHtml}
+                        ${moreRecordsHtml}
+                    </div>
+                </div>
+            `;
+        }
+
+        // 构建完整结果HTML
+        const alertClass = hasFailedRecords ? 'alert-warning' : 'alert-success';
+        const alertMessage = hasFailedRecords
+            ? '处理完成（部分记录失败）'
+            : '文件已成功向量化并存储到知识库';
+
         document.getElementById('resultContent').innerHTML = `
-            <div class="alert alert-success">
-                <strong>处理完成!</strong> 文件已成功向量化并存储到知识库
+            <div class="alert ${alertClass}">
+                <strong>处理完成!</strong> ${alertMessage}
             </div>
 
             <div class="result-summary">
@@ -1551,9 +1992,11 @@
                     <span><strong>总记录数:</strong></span>
                     <span>${data.total_records}</span>
                 </div>
-                <div class="result-item">
+                ${incrementalStatsHtml}
+                ${failedStatsHtml}
+                <div class="result-item" ${hasIncrementalStats || hasFailedRecords ? 'style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #e5e7eb;"' : ''}>
                     <span><strong>成功插入:</strong></span>
-                    <span>${data.inserted_records}</span>
+                    <span style="color: #10b981; font-weight: bold;">${data.inserted_records}</span>
                 </div>
                 <div class="result-item">
                     <span><strong>批处理大小:</strong></span>
@@ -1564,13 +2007,27 @@
                     <span style="font-family: monospace; background: #f3f4f6; padding: 2px 4px; border-radius: 2px;">${data.embedding_template_used}</span>
                 </div>
                 <div class="result-item">
-                    <span><strong>Embedding API耗时:</strong></span>
+                    <span><strong>向量化及存储耗时:</strong></span>
                     <span>${data.embedding_api_duration} 秒</span>
                 </div>
+                ${failedRecordsHtml}
             </div>
         `;
 
         document.getElementById('uploadAnotherBtn').style.display = 'inline-block';
+    }
+
+    // 切换失败记录显示
+    function toggleFailedRecords() {
+        const list = document.getElementById('failedRecordsList');
+        const toggle = document.getElementById('failedRecordsToggle');
+        if (list.style.display === 'none') {
+            list.style.display = 'block';
+            toggle.textContent = '(点击收起)';
+        } else {
+            list.style.display = 'none';
+            toggle.textContent = '(点击展开)';
+        }
     }
 
     function showErrorResult(message, data = null) {

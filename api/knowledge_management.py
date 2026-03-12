@@ -2,6 +2,7 @@ from fastapi import APIRouter, Request, HTTPException
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
 from services.knowledge_service import KnowledgeService
+from config.settings import settings
 import logging
 from pathlib import Path
 from typing import List, Dict, Any
@@ -73,23 +74,42 @@ async def get_collections(request: Request):
         for collection_name in collections:
             try:
                 stats = await knowledge_service.get_collection_stats(collection_name)
+                metadata = stats.get("metadata", {})
+
+                # 解析 source_files 为列表（用于前端文件名匹配）
+                source_files_str = metadata.get("source_files", "")
+                source_files_list = [f.strip() for f in source_files_str.split(",") if f.strip()]
+
+                # 获取 user_description，如果不存在则使用 display_name 作为默认值
+                default_display = collection_name.replace("_", " ").title()
+                user_description = metadata.get("user_description", default_display)
+
                 collections_info.append({
                     "name": collection_name,
                     "stats": stats,
-                    "display_name": collection_name.replace("_", " ").title(),
-                    "document_count": stats.get("count", 0),
+                    "display_name": default_display,
+                    "user_description": user_description,
+                    "document_count": stats.get("row_count", stats.get("count", 0)),
                     "created_time": stats.get("created_time", "未知"),
-                    "last_updated": stats.get("last_updated", "未知")
+                    "last_updated": stats.get("last_updated", "未知"),
+                    "source_files": source_files_list,
+                    "embedding_template": metadata.get("embedding_template", ""),
+                    "document_template": metadata.get("document_template", "")
                 })
             except Exception as e:
                 logger.warning(f"获取集合 {collection_name} 统计信息失败: {e}")
+                default_display = collection_name.replace("_", " ").title()
                 collections_info.append({
                     "name": collection_name,
                     "stats": {},
-                    "display_name": collection_name.replace("_", " ").title(),
+                    "display_name": default_display,
+                    "user_description": default_display,
                     "document_count": 0,
                     "created_time": "未知",
                     "last_updated": "未知",
+                    "source_files": [],
+                    "embedding_template": "",
+                    "document_template": "",
                     "error": str(e)
                 })
 
@@ -132,6 +152,93 @@ async def get_collection_details(collection_name: str, request: Request):
         return JSONResponse({
             "status": "error",
             "message": f"获取知识库详情失败: {str(e)}"
+        }, status_code=500)
+
+
+@router.get("/api/knowledge/collections/{collection_name}/metadata")
+async def get_collection_metadata(collection_name: str, request: Request):
+    """获取单个知识库集合的 metadata（用于增量上传时读取模板等信息）"""
+    try:
+        user = get_user_from_request(request)
+        logger.info(f"用户 {user.get('username', 'unknown')} 请求获取知识库 {collection_name} 的 metadata")
+
+        stats = await knowledge_service.get_collection_stats(collection_name)
+
+        if "error" in stats:
+            return JSONResponse({
+                "status": "error",
+                "message": f"知识库 '{collection_name}' 不存在或无法访问"
+            }, status_code=404)
+
+        metadata = stats.get("metadata", {})
+
+        # 解析 source_files 为列表
+        source_files_str = metadata.get("source_files", "")
+        source_files_list = [f.strip() for f in source_files_str.split(",") if f.strip()]
+
+        return JSONResponse({
+            "status": "success",
+            "data": {
+                "name": collection_name,
+                "metadata": {
+                    "embedding_template": metadata.get("embedding_template", ""),
+                    "document_template": metadata.get("document_template", ""),
+                    "source_files": source_files_list,
+                    "embedding_dimension": metadata.get("embedding_dimension"),
+                    "description": metadata.get("description", ""),
+                    "user_description": metadata.get("user_description", collection_name.replace("_", " ").title())
+                }
+            }
+        })
+
+    except Exception as e:
+        logger.error(f"获取知识库 metadata 失败: {e}")
+        return JSONResponse({
+            "status": "error",
+            "message": f"获取 metadata 失败: {str(e)}"
+        }, status_code=500)
+
+
+@router.patch("/api/knowledge/collections/{collection_name}/metadata")
+async def update_collection_metadata(collection_name: str, request: Request):
+    """更新知识库集合的 metadata（如描述等）"""
+    try:
+        user = get_user_from_request(request)
+        logger.info(f"用户 {user.get('username', 'unknown')} 请求更新知识库 {collection_name} 的 metadata")
+
+        # 解析请求体
+        body = await request.json()
+
+        # 只允许更新特定字段（user_description）
+        allowed_fields = {"user_description"}
+        update_data = {k: v for k, v in body.items() if k in allowed_fields}
+
+        if not update_data:
+            return JSONResponse({
+                "status": "error",
+                "message": "没有可更新的字段，允许的字段: user_description"
+            }, status_code=400)
+
+        # 调用 vector_client 更新 metadata
+        success = knowledge_service.vector_client.update_collection_metadata(collection_name, update_data)
+
+        if success:
+            return JSONResponse({
+                "status": "success",
+                "message": "metadata 更新成功",
+                "data": {"updated_fields": list(update_data.keys())}
+            })
+        else:
+            return JSONResponse({
+                "status": "error",
+                "message": "更新 metadata 失败"
+            }, status_code=500)
+
+    except Exception as e:
+        logger.error(f"更新知识库 metadata 失败: {e}")
+        return JSONResponse({
+            "status": "error",
+            "message": f"更新 metadata 失败: {str(e)}"
         }, status_code=500)
 
 
@@ -459,12 +566,13 @@ async def preview_upload_file(request: Request, file: UploadFile = File(...)):
         # 读取文件内容
         file_content = await file.read()
 
-        # 验证文件大小 (限制为50MB)
-        max_size = 50 * 1024 * 1024  # 50MB
+        # 验证文件大小
+        max_size = settings.KNOWLEDGE_UPLOAD_MAX_FILE_SIZE
+        max_size_mb = max_size / 1024 / 1024
         if len(file_content) > max_size:
             return JSONResponse({
                 "status": "error",
-                "message": f"文件太大，限制为50MB，当前文件: {len(file_content) / 1024 / 1024:.1f}MB"
+                "message": f"文件太大，限制为{max_size_mb:.0f}MB，当前文件: {len(file_content) / 1024 / 1024:.1f}MB"
             }, status_code=400)
 
         # 验证文件类型
@@ -511,9 +619,13 @@ async def process_upload_file(
         collection_name: str = Form(...),
         batch_size: int = Form(5),
         num_workers: int = Form(1),
-        embedding_model: str = Form(None)  # "provider,model" 格式
+        embedding_model: str = Form(None),  # "provider,model" 格式
+        enable_incremental: bool = Form(True),  # 是否启用增量上传
+        dedup_field: str = Form(None),  # 去重字段名（可选）
+        insert_batch_multiplier: int = Form(10),  # 数据库插入倍率
+        enable_column_update: bool = Form(False)  # 是否启用列更新
 ):
-    """处理文件上传和向量化（异步处理）"""
+    """处理文件上传和向量化（异步处理，支持增量上传）"""
     try:
         user = get_user_from_request(request)
 
@@ -525,13 +637,14 @@ async def process_upload_file(
             "status": "starting",
             "stage": "初始化",
             "stage_number": 0,
-            "total_stages": 5,
+            "total_stages": 5,  # 阶段5合并了向量化和存储
             "current_batch": 0,
             "total_batches": 0,
             "progress_percent": 0,
             "message": "任务已创建，准备开始...",
             "result": None,
-            "error": None
+            "error": None,
+            "skipped_duplicates": 0  # 跳过的重复记录数
         }
 
         logger.info(f"用户 {user.get('username', 'unknown')} 创建向量化任务: {task_id}")
@@ -567,6 +680,12 @@ async def process_upload_file(
                 "message": "并发Worker数必须在1-16之间"
             }, status_code=400)
 
+        if insert_batch_multiplier < 1 or insert_batch_multiplier > 100:
+            return JSONResponse({
+                "status": "error",
+                "message": "数据库插入倍率必须在1-100之间"
+            }, status_code=400)
+
         # 解析embedding模型
         embedding_provider = None
         embedding_model_name = None
@@ -583,6 +702,11 @@ async def process_upload_file(
         # 读取文件内容
         file_content = await file.read()
 
+        # 处理 dedup_field（空字符串转为 None）
+        dedup_field_value = dedup_field.strip() if dedup_field and dedup_field.strip() else None
+
+        logger.info(f"任务 {task_id} 增量上传配置: enable_incremental={enable_incremental}, dedup_field={dedup_field_value}, enable_column_update={enable_column_update}")
+
         # 后台异步处理
         background_tasks.add_task(
             knowledge_service.process_and_vectorize_file_async,
@@ -596,7 +720,11 @@ async def process_upload_file(
             num_workers,
             progress_storage,
             embedding_provider,
-            embedding_model_name
+            embedding_model_name,
+            enable_incremental,
+            dedup_field_value,
+            insert_batch_multiplier,
+            enable_column_update
         )
 
         return JSONResponse({

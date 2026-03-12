@@ -38,13 +38,36 @@ class VectorDBInterface(ABC):
         pass
 
     @abstractmethod
-    def query_by_ids(self, collection_name: str, ids: List[str]) -> List[Dict[str, Any]]:
-        """根据ID查询"""
+    def query_by_ids(self, collection_name: str, ids: List[str],
+                     include: Optional[List[str]] = None) -> List[Dict[str, Any]]:
+        """根据ID查询
+
+        Args:
+            collection_name: 集合名称
+            ids: 要查询的文档ID列表
+            include: 要包含的字段列表，可选值: ['embeddings', 'documents', 'metadatas']
+                     默认 None 表示返回全部字段
+
+        Returns:
+            数据列表
+        """
         pass
 
     @abstractmethod
-    def get_all_data(self, collection_name: str, limit: int = 1000) -> List[Dict[str, Any]]:
-        """获取所有数据"""
+    def get_all_data(self, collection_name: str, limit: int = 1000, offset: int = 0,
+                     include: Optional[List[str]] = None) -> List[Dict[str, Any]]:
+        """获取所有数据
+
+        Args:
+            collection_name: 集合名称
+            limit: 最大返回数量
+            offset: 起始偏移量，用于分批读取
+            include: 要包含的字段列表，可选值: ['embeddings', 'documents', 'metadatas']
+                     默认 None 表示返回全部字段
+
+        Returns:
+            数据列表
+        """
         pass
 
     @abstractmethod

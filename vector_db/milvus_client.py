@@ -1,5 +1,15 @@
+"""
+Milvus 向量数据库客户端
+
+⚠️ 警告：此 Milvus 客户端实现已过时，与当前 VectorDBInterface 接口不完全兼容。
+TODO: 全面重构 Milvus 客户端以兼容最新接口规范，包括：
+  - 实现 get_all_data 的 include 参数
+  - 实现 query_by_ids 的 include 参数
+  - 完善其他缺失的接口方法
+"""
+
 from pymilvus import MilvusClient, DataType
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 import pandas as pd
 from .base import VectorDBInterface
 from .embedding_client import OpenAIEmbeddingAPI

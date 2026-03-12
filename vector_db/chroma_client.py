@@ -1,3 +1,4 @@
+import time
 import chromadb
 from typing import List, Dict, Any, Optional
 from datetime import datetime
@@ -175,14 +176,20 @@ class ChromaDBClient(VectorDBInterface):
 
     def query_by_vector(self, collection_name: str, query_vector: List[float],
                         top_k: int = 10, **kwargs) -> List[Dict[str, Any]]:
-        """向量查询"""
+        """向量查询
+
+        注意：ChromaDB 默认使用 L2 距离（squared L2）。
+        对于归一化向量，L2² = 2 * (1 - cosine_similarity)，
+        因此 cosine_similarity = 1 - distance / 2
+        """
         try:
             collection = self.client.get_collection(name=collection_name)
 
+            # 不再请求 embeddings，直接使用 distance 计算相似度
             results = collection.query(
                 query_embeddings=[query_vector],
                 n_results=top_k,
-                include=['documents', 'metadatas', 'distances', 'embeddings']
+                include=['documents', 'metadatas', 'distances']
             )
 
             # 格式化结果
@@ -212,24 +219,17 @@ class ChromaDBClient(VectorDBInterface):
                         metadata = results['metadatas'][0][i]
                         result['metadata'] = metadata if metadata is not None else {}
 
-                    # 安全地处理距离
+                    # 处理距离并计算相似度
+                    # ChromaDB L2 距离 + 归一化向量: distance = 2 * (1 - cosine_similarity)
                     if (results.get('distances') is not None and
                             len(results['distances']) > 0 and
                             i < len(results['distances'][0])):
                         distance = results['distances'][0][i]
                         result['distance'] = float(distance) if distance is not None else 0.0
-                        # ChromaDB的距离是基于1-cosine_similarity的，所以相似度为1-distance
-                        result['similarity'] = 1 - result['distance']
-
-                    # 计算正确的余弦相似度
-                    if (results.get('embeddings') is not None and
-                            len(results['embeddings']) > 0 and
-                            i < len(results['embeddings'][0])):
-                        doc_embedding = results['embeddings'][0][i]
-                        if doc_embedding is not None:
-                            result['cosine_similarity'] = self._calculate_cosine_similarity(
-                                query_vector, doc_embedding
-                            )
+                        # 正确的公式：cosine_similarity = 1 - distance / 2
+                        cosine_sim = 1 - result['distance'] / 2
+                        result['similarity'] = cosine_sim
+                        result['cosine_similarity'] = cosine_sim
 
                     formatted_results.append(result)
 
@@ -239,14 +239,29 @@ class ChromaDBClient(VectorDBInterface):
             print(f"❌ 向量查询失败: {e}")
             return []
 
-    def query_by_ids(self, collection_name: str, ids: List[str]) -> List[Dict[str, Any]]:
-        """根据ID查询"""
+    def query_by_ids(self, collection_name: str, ids: List[str],
+                     include: Optional[List[str]] = None) -> List[Dict[str, Any]]:
+        """根据ID查询
+
+        Args:
+            collection_name: 集合名称
+            ids: 要查询的文档ID列表
+            include: 要包含的字段列表，可选值: ['embeddings', 'documents', 'metadatas']
+                     默认 None 表示返回全部字段
+
+        Returns:
+            数据列表
+        """
         try:
             collection = self.client.get_collection(name=collection_name)
 
+            # 默认返回全部字段（向后兼容）
+            if include is None:
+                include = ['documents', 'metadatas', 'embeddings']
+
             results = collection.get(
                 ids=ids,
-                include=['documents', 'metadatas', 'embeddings']
+                include=include
             )
 
             # 格式化结果
@@ -257,23 +272,26 @@ class ChromaDBClient(VectorDBInterface):
                         'id': results['ids'][i]
                     }
 
-                    # 安全地处理 documents
-                    if results.get('documents') is not None and i < len(results['documents']):
-                        result['document'] = results['documents'][i] if results['documents'][i] is not None else ""
-                    else:
-                        result['document'] = ""
+                    # 安全地处理 documents（仅当请求了 documents 时）
+                    if 'documents' in include:
+                        if results.get('documents') is not None and i < len(results['documents']):
+                            result['document'] = results['documents'][i] if results['documents'][i] is not None else ""
+                        else:
+                            result['document'] = ""
 
-                    # 安全地处理 metadatas
-                    if results.get('metadatas') is not None and i < len(results['metadatas']):
-                        result['metadata'] = results['metadatas'][i] if results['metadatas'][i] is not None else {}
-                    else:
-                        result['metadata'] = {}
+                    # 安全地处理 metadatas（仅当请求了 metadatas 时）
+                    if 'metadatas' in include:
+                        if results.get('metadatas') is not None and i < len(results['metadatas']):
+                            result['metadata'] = results['metadatas'][i] if results['metadatas'][i] is not None else {}
+                        else:
+                            result['metadata'] = {}
 
-                    # 安全地处理 embeddings
-                    if results.get('embeddings') is not None and i < len(results['embeddings']):
-                        result['embedding'] = results['embeddings'][i] if results['embeddings'][i] is not None else []
-                    else:
-                        result['embedding'] = []
+                    # 安全地处理 embeddings（仅当请求了 embeddings 时）
+                    if 'embeddings' in include:
+                        if results.get('embeddings') is not None and i < len(results['embeddings']):
+                            result['embedding'] = results['embeddings'][i] if results['embeddings'][i] is not None else []
+                        else:
+                            result['embedding'] = []
 
                     formatted_results.append(result)
 
@@ -283,50 +301,86 @@ class ChromaDBClient(VectorDBInterface):
             print(f"❌ ID查询失败: {e}")
             return []
 
-    def get_all_data(self, collection_name: str, limit: int = 1000) -> List[Dict[str, Any]]:
-        """获取所有数据"""
-        try:
-            collection = self.client.get_collection(name=collection_name)
+    def get_all_data(self, collection_name: str, limit: int = 1000, offset: int = 0,
+                     include: Optional[List[str]] = None) -> List[Dict[str, Any]]:
+        """获取所有数据
 
-            # ChromaDB没有直接的分页查询，需要通过其他方式获取
+        Args:
+            collection_name: 集合名称
+            limit: 最大返回数量
+            offset: 起始偏移量，用于分批读取
+            include: 要包含的字段列表，可选值: ['embeddings', 'documents', 'metadatas']
+                     默认 None 表示返回全部字段
+
+        Returns:
+            数据列表
+        """
+        try:
+            # === ChromaDB get_all_data 耗时分析 ===
+            print(f"  [ChromaDB] get_all_data 开始 (offset={offset}, limit={limit}, include={include})")
+
+            # 步骤2.1: 获取 collection 对象
+            t2_1 = time.time()
+            collection = self.client.get_collection(name=collection_name)
+            print(f"  [步骤2.1] 获取 collection 对象: {time.time()-t2_1:.3f}s")
+
+            # 默认返回全部字段（向后兼容）
+            if include is None:
+                include = ['documents', 'metadatas', 'embeddings']
+
+            # 步骤2.2: 调用 collection.get() 从数据库读取数据
+            t2_2 = time.time()
             results = collection.get(
                 limit=limit,
-                include=['documents', 'metadatas', 'embeddings']
+                offset=offset,
+                include=include
             )
+            print(f"  [步骤2.2] collection.get() 读取数据: {time.time()-t2_2:.3f}s")
 
-            # 格式化结果
+            # 步骤2.3: 格式化结果 - 遍历并构建字典列表
+            t2_3 = time.time()
             formatted_results = []
             if results['ids'] and len(results['ids']) > 0:
                 for i in range(len(results['ids'])):
                     result = {
-                        'id': results['ids'][i],
-                        'document': "",
-                        'embedding': [],
-                        'dense_vector': []
+                        'id': results['ids'][i]
                     }
 
-                    # 安全地处理文档
-                    if results.get('documents') is not None and i < len(results['documents']):
-                        result['document'] = results['documents'][i] if results['documents'][i] is not None else ""
+                    # 安全地处理文档（仅当请求了 documents 时）
+                    if 'documents' in include:
+                        if results.get('documents') is not None and i < len(results['documents']):
+                            result['document'] = results['documents'][i] if results['documents'][i] is not None else ""
+                        else:
+                            result['document'] = ""
 
-                    # 安全地处理嵌入向量
-                    if results.get('embeddings') is not None and i < len(results['embeddings']):
-                        embedding = results['embeddings'][i]
-                        if embedding is not None:
-                            result['embedding'] = embedding
-                            result['dense_vector'] = embedding
+                    # 安全地处理嵌入向量（仅当请求了 embeddings 时）
+                    if 'embeddings' in include:
+                        if results.get('embeddings') is not None and i < len(results['embeddings']):
+                            embedding = results['embeddings'][i]
+                            if embedding is not None:
+                                result['embedding'] = embedding
+                                result['dense_vector'] = embedding
+                            else:
+                                result['embedding'] = []
+                                result['dense_vector'] = []
+                        else:
+                            result['embedding'] = []
+                            result['dense_vector'] = []
 
-                    # 安全地处理元数据字段
-                    if results.get('metadatas') is not None and i < len(results['metadatas']):
-                        metadata = results['metadatas'][i]
-                        if metadata is not None and isinstance(metadata, dict):
-                            for key, value in metadata.items():
-                                # 避免覆盖系统字段
-                                if key not in ['id', 'document', 'embedding', 'dense_vector']:
-                                    result[key] = value
+                    # 安全地处理元数据字段（仅当请求了 metadatas 时）
+                    if 'metadatas' in include:
+                        if results.get('metadatas') is not None and i < len(results['metadatas']):
+                            metadata = results['metadatas'][i]
+                            if metadata is not None and isinstance(metadata, dict):
+                                for key, value in metadata.items():
+                                    # 避免覆盖系统字段
+                                    if key not in ['id', 'document', 'embedding', 'dense_vector']:
+                                        result[key] = value
 
                     formatted_results.append(result)
+            print(f"  [步骤2.3] 格式化结果循环: {time.time()-t2_3:.3f}s  (构建 {len(formatted_results)} 条字典)")
 
+            print("  [ChromaDB] get_all_data 结束")
             return formatted_results
 
         except Exception as e:
@@ -350,6 +404,35 @@ class ChromaDBClient(VectorDBInterface):
         except Exception as e:
             print(f"❌ 获取统计信息失败: {e}")
             return {"error": str(e)}
+
+    def update_collection_metadata(self, collection_name: str, metadata: Dict[str, Any]) -> bool:
+        """更新集合的 metadata
+
+        Args:
+            collection_name: 集合名称
+            metadata: 要更新的 metadata 字典（将与现有 metadata 合并）
+
+        Returns:
+            是否更新成功
+        """
+        try:
+            collection = self.client.get_collection(name=collection_name)
+
+            # 获取现有 metadata
+            current_metadata = collection.metadata or {}
+
+            # 合并 metadata（新值覆盖旧值）
+            updated_metadata = {**current_metadata, **metadata}
+
+            # ChromaDB 使用 modify 方法更新 collection metadata
+            collection.modify(metadata=updated_metadata)
+
+            print(f"✅ Collection '{collection_name}' metadata 更新成功")
+            return True
+
+        except Exception as e:
+            print(f"❌ 更新 Collection metadata 失败: {e}")
+            return False
 
     def get_collection_fields(self, collection_name: str) -> List[str]:
         """获取集合字段"""

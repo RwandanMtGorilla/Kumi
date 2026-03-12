@@ -209,6 +209,9 @@ async def dashboard(request: Request):
 async def knowledge_upload(request: Request):
     """知识文件上传页面"""
     context = get_template_context(request, "knowledge_upload")
+    # 添加文件大小限制配置
+    context["max_file_size_bytes"] = settings.KNOWLEDGE_UPLOAD_MAX_FILE_SIZE
+    context["max_file_size_mb"] = int(settings.KNOWLEDGE_UPLOAD_MAX_FILE_SIZE / 1024 / 1024)
     return templates.TemplateResponse("pages/knowledge/upload.html", context)
 
 

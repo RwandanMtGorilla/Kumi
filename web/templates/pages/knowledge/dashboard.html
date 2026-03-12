@@ -278,6 +278,72 @@
         transform: translateX(0) !important;
     }
 
+    /* 编辑弹窗样式 */
+    .knowledge-dashboard .modal {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.5);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 10000;
+    }
+
+    .knowledge-dashboard .modal-content {
+        background: white;
+        border-radius: 8px;
+        width: 90%;
+        max-width: 500px;
+        max-height: 90vh;
+        overflow: auto;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    }
+
+    .knowledge-dashboard .modal-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 1.25rem 1.5rem;
+        border-bottom: 1px solid #e5e7eb;
+    }
+
+    .knowledge-dashboard .modal-header h3 {
+        margin: 0;
+        font-size: 1.25rem;
+        font-weight: 600;
+        color: #1f2937;
+    }
+
+    .knowledge-dashboard .modal-close {
+        background: none;
+        border: none;
+        font-size: 1.25rem;
+        color: #6b7280;
+        cursor: pointer;
+        padding: 0.25rem;
+        line-height: 1;
+        transition: color 0.2s;
+    }
+
+    .knowledge-dashboard .modal-close:hover {
+        color: #1f2937;
+    }
+
+    .knowledge-dashboard .modal-body {
+        padding: 1.5rem;
+    }
+
+    .knowledge-dashboard .modal-footer {
+        display: flex;
+        justify-content: flex-end;
+        gap: 0.75rem;
+        padding: 1rem 1.5rem;
+        border-top: 1px solid #e5e7eb;
+    }
+
     /* 点击确认状态（防误触） */
     .knowledge-dashboard .collection-card.click-pending {
         border-color: #6666FF !important;
@@ -431,6 +497,34 @@
         <i class="bi bi-check-circle me-2"></i>
         <span>库名已复制到剪贴板</span>
     </div>
+
+    <!-- 编辑知识库信息弹窗 -->
+    <div id="editModal" class="modal" style="display: none;">
+        <div class="modal-content" style="max-width: 500px;">
+            <div class="modal-header">
+                <h3>编辑知识库信息</h3>
+                <button class="modal-close" onclick="closeEditModal()">
+                    <i class="bi bi-x-lg"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label">知识库名称</label>
+                    <input type="text" id="editCollectionName" class="form-input" readonly style="background: #f3f4f6; cursor: not-allowed;">
+                    <small style="color: #6b7280;">知识库名称不可修改</small>
+                </div>
+                <div class="form-group" style="margin-top: 16px;">
+                    <label class="form-label" for="editDescription">描述</label>
+                    <textarea id="editDescription" class="form-textarea" rows="3" placeholder="输入知识库的描述信息..."></textarea>
+                    <small style="color: #6b7280;">简要描述该知识库的用途和内容</small>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeEditModal()">取消</button>
+                <button class="btn btn-primary" onclick="saveEditModal()" id="saveEditBtn">保存</button>
+            </div>
+        </div>
+    </div>
 </div>
 
 <script>
@@ -489,6 +583,27 @@
         const card = document.createElement('div');
         card.className = 'knowledge-card collection-card';
 
+        // 格式化文件名列表（最多显示2个）
+        const sourceFiles = collection.source_files || [];
+        let filesDisplay = '';
+        if (sourceFiles.length > 0) {
+            const fileNames = sourceFiles.slice(0, 2).join(', ');
+            const moreCount = sourceFiles.length > 2 ? ` +${sourceFiles.length - 2}` : '';
+            filesDisplay = `
+                <div style="display: flex; align-items: center; gap: 4px; color: #9ca3af; font-size: 0.75rem; margin-top: 8px;">
+                    <i class="bi bi-file-earmark-text" style="font-size: 0.85rem;"></i>
+                    <span title="${sourceFiles.join(', ')}">${fileNames}${moreCount}</span>
+                </div>`;
+        }
+
+        // 格式化条目数
+        const docCount = collection.document_count || 0;
+        const countDisplay = `
+            <div style="display: flex; align-items: center; gap: 4px; color: #9ca3af; font-size: 0.75rem; margin-top: 4px;">
+                <i class="bi bi-card-list" style="font-size: 0.85rem;"></i>
+                <span>${docCount.toLocaleString()} 条记录</span>
+            </div>`;
+
         card.innerHTML = `
             <div class="card-content">
                 <div class="card-icon">
@@ -496,7 +611,9 @@
                 </div>
                 <div class="card-text">
                     <div class="card-title" title="${collection.display_name}">${collection.display_name}</div>
-                    <div class="card-subtitle" title="${collection.name}">${collection.name}</div>
+                    <div class="card-subtitle" title="${collection.user_description || collection.name}">${collection.user_description || collection.name}</div>
+                    ${filesDisplay}
+                    ${countDisplay}
                 </div>
             </div>
             <div class="bottom-area"></div>
@@ -505,6 +622,10 @@
             </button>
             <div class="menu-container" data-menu="${collection.name}">
                 <div class="delete-menu">
+                    <button class="menu-btn edit-btn" data-action="edit" data-collection="${collection.name}">
+                        <i class="bi bi-pencil"></i>
+                        编辑信息
+                    </button>
                     <button class="menu-btn copy-btn" data-action="copy" data-collection="${collection.name}">
                         <i class="bi bi-copy"></i>
                         复制库名
@@ -557,7 +678,8 @@
                 const collectionName = this.dataset.collection;
 
                 if (action === 'edit') {
-                    editKnowledge(collectionName);
+                    // 打开编辑弹窗（而不是跳转到编辑页面）
+                    openEditModal(collection);
                 } else if (action === 'copy') {
                     copyCollectionName(collectionName);
                 } else if (action === 'delete') {
@@ -646,9 +768,15 @@
         });
     }
 
-    // 显示复制成功提示
-    function showCopyToast() {
+    // 显示提示 Toast（支持自定义消息）
+    function showCopyToast(message, icon) {
         const toast = document.getElementById('copyToast');
+
+        // 始终更新消息和图标（使用默认值或传入值）
+        const messageText = message || '库名已复制到剪贴板';
+        const iconClass = icon === 'success' ? 'bi-check-circle' : 'bi-copy';
+        toast.innerHTML = `<i class="bi ${iconClass} me-2"></i><span>${messageText}</span>`;
+
         toast.classList.add('show');
 
         setTimeout(() => {
@@ -672,6 +800,90 @@
     function editKnowledge(collectionName) {
         window.location.href = `/web/knowledge/edit/${encodeURIComponent(collectionName)}`;
     }
+
+    // ============ 编辑弹窗相关函数 ============
+
+    let currentEditingCollection = null;
+
+    // 打开编辑弹窗
+    function openEditModal(collection) {
+        currentEditingCollection = collection;
+
+        // 填充数据
+        document.getElementById('editCollectionName').value = collection.name;
+        document.getElementById('editDescription').value = collection.user_description || collection.display_name;
+
+        // 显示弹窗
+        document.getElementById('editModal').style.display = 'flex';
+
+        // 聚焦到描述输入框
+        setTimeout(() => {
+            document.getElementById('editDescription').focus();
+        }, 100);
+    }
+
+    // 关闭编辑弹窗
+    function closeEditModal() {
+        document.getElementById('editModal').style.display = 'none';
+        currentEditingCollection = null;
+    }
+
+    // 保存编辑
+    async function saveEditModal() {
+        if (!currentEditingCollection) return;
+
+        const newDescription = document.getElementById('editDescription').value.trim();
+
+        if (!newDescription) {
+            alert('请输入描述信息');
+            return;
+        }
+
+        const saveBtn = document.getElementById('saveEditBtn');
+        const originalText = saveBtn.textContent;
+        saveBtn.disabled = true;
+        saveBtn.textContent = '保存中...';
+
+        try {
+            const response = await fetch(`/web/api/knowledge/collections/${encodeURIComponent(currentEditingCollection.name)}/metadata`, {
+                method: 'PATCH',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    user_description: newDescription
+                })
+            });
+
+            const result = await response.json();
+
+            if (result.status === 'success') {
+                // 更新成功，关闭弹窗并刷新列表
+                closeEditModal();
+                showCopyToast('知识库信息更新成功', 'success');
+                loadKnowledgeBases();
+            } else {
+                alert('更新失败: ' + result.message);
+            }
+        } catch (error) {
+            alert('更新失败: ' + error.message);
+        } finally {
+            saveBtn.disabled = false;
+            saveBtn.textContent = originalText;
+        }
+    }
+
+    // 点击弹窗背景关闭
+    document.addEventListener('DOMContentLoaded', function() {
+        const modal = document.getElementById('editModal');
+        modal.addEventListener('click', function(e) {
+            if (e.target === modal) {
+                closeEditModal();
+            }
+        });
+    });
+
+    // ============ 编辑弹窗函数结束 ============
 
     // 删除知识库
     async function deleteKnowledge(collectionName, displayName) {

@@ -178,6 +178,21 @@
 </template>
 
 <template id="tpl-filters">
+    <!-- 筛选器标签页切换（仅在减数模式下显示） -->
+    <div class="filter-tabs-header" id="filterTabsHeader" style="display: none;">
+        <div class="filter-tabs-info">
+            <span id="filterTabHint">当前作用于: 显示数据</span>
+        </div>
+        <div class="filter-tabs-buttons">
+            <button class="filter-tab-btn active" id="mainFilterTab" onclick="switchFilterTab('main')">
+                主筛选器
+            </button>
+            <button class="filter-tab-btn" id="subtractFilterTab" onclick="switchFilterTab('subtract')">
+                减数图筛选器
+            </button>
+        </div>
+    </div>
+
     <div class="control-group" id="displayFieldControls" style="display: none;">
         <label for="xDisplayField">横坐标显示字段</label>
         <select id="xDisplayField">

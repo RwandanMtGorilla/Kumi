@@ -14,6 +14,7 @@ import traceback
 import numpy as np
 import time
 import threading
+import hashlib
 
 
 logger = logging.getLogger(__name__)
@@ -281,6 +282,10 @@ class KnowledgeService:
                     if key not in ['embedding', 'dense_vector']:
                         clean_metadata[key] = value
 
+                # 确保文档 ID 存在于 metadata 中（用于 UMAP 等功能的 ID 映射）
+                if 'id' in result:
+                    clean_metadata['id'] = result['id']
+
                 record = RetrievalRecord(
                     content=content,
                     score=score,
@@ -547,6 +552,48 @@ class KnowledgeService:
             logger.error(f"模板解析失败: {e}")
             return str(row_data)
 
+    def _compute_document_hash(self, text: str) -> str:
+        """计算 document 文本的 MD5 hash，用于去重"""
+        return hashlib.md5(text.encode('utf-8')).hexdigest()
+
+    async def get_existing_values_for_dedup(
+            self,
+            collection_name: str,
+            dedup_field: str = None
+    ) -> set:
+        """
+        获取知识库中已存在的去重值集合
+
+        Args:
+            collection_name: 集合名称
+            dedup_field: 去重字段名。如果为 None，则使用 document 文本的 hash
+
+        Returns:
+            已存在值的集合（hash 值或字段值）
+        """
+        if not self.vector_client.has_collection(collection_name):
+            return set()
+
+        loop = asyncio.get_event_loop()
+        all_data = await loop.run_in_executor(
+            None, self.vector_client.get_all_data, collection_name, None
+        )
+
+        existing_values = set()
+        for doc in all_data:
+            if dedup_field:
+                # 使用指定字段值
+                field_value = doc.get(dedup_field)
+                if field_value is not None and field_value != '':
+                    existing_values.add(str(field_value))
+            else:
+                # 使用 document 文本的 hash
+                doc_text = doc.get('document', '')
+                if doc_text:
+                    existing_values.add(self._compute_document_hash(doc_text))
+
+        return existing_values
+
     async def get_file_preview(self, file_content: bytes, filename: str, max_rows: int = 5) -> Dict[str, Any]:
         """预览文件内容，用于前端显示"""
         try:
@@ -647,12 +694,14 @@ class KnowledgeService:
 
             # 在当前阶段中的进度计算
             if total_batches > 0:
-                # 有批次信息的情况（如阶段5存储数据库）
+                # 有批次信息的情况
                 completed_batches = current_batch if batch_completed else max(0, current_batch - 1)
-                batch_progress = completed_batches / total_batches / total_stages
+                # sub_progress 表示当前未完成 batch 内部的进度 (0.0-1.0)
+                inner_progress = sub_progress if not batch_completed and sub_progress > 0 else 0
+                batch_progress = (completed_batches + inner_progress) / total_batches / total_stages
                 sub_stage_progress = 0
             else:
-                # 没有批次信息但有子进度的情况（如阶段4的embedding）
+                # 没有批次信息但有子进度的情况
                 batch_progress = 0
                 # 子阶段进度贡献到当前阶段
                 sub_stage_progress = sub_progress / total_stages
@@ -704,6 +753,24 @@ class KnowledgeService:
                 chunks.append(chunk)
         return chunks
 
+    async def _vectorize_single_text(
+            self,
+            text: str,
+            embedding_provider: str = None,
+            embedding_model: str = None
+    ) -> List[float]:
+        """单条文本向量化（用于容错处理）"""
+        loop = asyncio.get_event_loop()
+        vectors = await loop.run_in_executor(
+            None,
+            self.embedding_service.encode_texts,
+            [text],
+            embedding_provider,
+            embedding_model,
+            1  # batch_size=1
+        )
+        return vectors[0] if vectors else None
+
     async def process_and_vectorize_file_async(
             self,
             task_id: str,
@@ -716,12 +783,33 @@ class KnowledgeService:
             num_workers: int,
             progress_storage: dict,
             embedding_provider: str = None,
-            embedding_model: str = None
+            embedding_model: str = None,
+            enable_incremental: bool = True,
+            dedup_field: str = None,
+            insert_batch_multiplier: int = 10,
+            enable_column_update: bool = False
     ):
-        """异步处理文件向量化（带进度追踪，支持并发Worker）"""
+        """
+        异步处理文件向量化（带进度追踪，支持并发Worker，支持增量上传和容错处理）
+
+        Args:
+            enable_incremental: 是否启用增量上传（跳过已存在的记录）
+            dedup_field: 去重字段名。如果为 None，则使用 document 文本的 hash 进行去重
+            enable_column_update: 是否启用列更新（更新已存在记录的 metadata）
+        """
         try:
-            logger.info(f"任务 {task_id} 开始,收到参数：batch_size={batch_size}, num_workers={num_workers}")
-            total_stages = 5
+            logger.info(f"任务 {task_id} 开始,收到参数：batch_size={batch_size}, num_workers={num_workers}, "
+                       f"insert_batch_multiplier={insert_batch_multiplier}, "
+                       f"enable_incremental={enable_incremental}, dedup_field={dedup_field}, "
+                       f"enable_column_update={enable_column_update}")
+            total_stages = 5  # 阶段5合并了向量化和存储
+
+            # 初始化失败记录收集器
+            failed_records = []
+            skipped_duplicates = 0
+            embedding_failed_count = 0
+            storage_failed_count = 0
+            updated_count = 0  # 列更新的记录数
 
             # 阶段1: 读取文件 - 开始
             self.update_progress(task_id, progress_storage, "读取文件数据", 1, total_stages,
@@ -772,219 +860,528 @@ class KnowledgeService:
                                      message="模板验证通过，所有字段都存在于数据中",
                                      stage_completed=True)
 
-                # 阶段3: 准备向量数据库 - 开始
-                self.update_progress(task_id, progress_storage, "准备向量数据库", 3, total_stages,
-                                     message="正在创建或连接collection...")
-
-                # 创建或获取collection
-                if not self.vector_client.has_collection(collection_name):
-                    self.vector_client.create_collection(collection_name)
-
-                # 计算批次信息
-                total_batches = (len(df) + batch_size - 1) // batch_size
-
-                # 阶段3: 准备向量数据库 - 完成
-                self.update_progress(task_id, progress_storage, "准备向量数据库", 3, total_stages,
-                                     message=f"Collection准备完成，将分 {total_batches} 个批次处理",
-                                     stage_completed=True)
-
-                # 阶段4: 生成向量嵌入 - 开始
-                self.update_progress(task_id, progress_storage, "生成向量嵌入", 4, total_stages,
-                                     message="正在生成embedding文本和document文本...")
-
-                # 生成embedding文本和document文本
-                embedding_texts = []
-                document_texts = []
-
+                # ========== 阶段3: 去重检查（新增） ==========
+                # 先生成所有记录的 document 文本，用于去重判断
+                all_row_data = []  # 存储 (原始索引, row_dict, document_text)
                 for idx, row in df.iterrows():
-                    # 清理行数据
                     row_dict = {}
                     for column, value in row.items():
                         if pd.isna(value) or value in [np.inf, -np.inf]:
                             row_dict[column] = ""
                         else:
                             row_dict[column] = str(value) if not isinstance(value, (str, int, float, bool)) else value
+                    document_text = self._parse_embedding_template(document_template, row_dict)
+                    all_row_data.append((idx, row_dict, document_text))
 
-                    # 生成文本
+                # 执行去重检查
+                rows_to_process = []  # 需要处理的记录：(原始索引, row_dict, document_text)
+                original_indices = []  # 保存原始DataFrame索引，用于后续存储
+                records_to_update = []  # 列更新模式下需要更新的记录：(id, row_dict)
+
+                if enable_incremental:
+                    self.update_progress(task_id, progress_storage, "去重检查", 3, total_stages,
+                                        message="正在获取知识库已有数据进行比对...")
+
+                    # 获取已存在的值集合
+                    existing_values = await self.get_existing_values_for_dedup(collection_name, dedup_field)
+
+                    self.update_progress(task_id, progress_storage, "去重检查", 3, total_stages,
+                                        message=f"已获取 {len(existing_values)} 条已有记录，正在比对...")
+
+                    # 比对去重
+                    for idx, row_dict, document_text in all_row_data:
+                        if dedup_field:
+                            # 使用指定字段值
+                            dedup_value = str(row_dict.get(dedup_field, ''))
+                        else:
+                            # 使用 document 文本的 hash
+                            dedup_value = self._compute_document_hash(document_text)
+
+                        if dedup_value in existing_values:
+                            if enable_column_update and dedup_field == 'id':
+                                # 列更新模式：收集需要更新 metadata 的记录
+                                records_to_update.append((dedup_value, row_dict))
+                            else:
+                                # 普通模式：跳过重复记录
+                                skipped_duplicates += 1
+                        else:
+                            rows_to_process.append((idx, row_dict, document_text))
+                            original_indices.append(idx)
+                            # 将新值加入集合，避免文件内重复
+                            existing_values.add(dedup_value)
+
+                    # 执行列更新
+                    if records_to_update:
+                        self.update_progress(task_id, progress_storage, "去重检查", 3, total_stages,
+                                            message=f"正在更新 {len(records_to_update)} 条已有记录的 metadata...")
+
+                        update_batch_size = 100
+                        for batch_start in range(0, len(records_to_update), update_batch_size):
+                            batch_end = min(batch_start + update_batch_size, len(records_to_update))
+                            batch = records_to_update[batch_start:batch_end]
+
+                            ids_to_update = [item[0] for item in batch]
+                            metadatas_to_update = []
+
+                            for record_id, row_dict in batch:
+                                # 清理 metadata，移除系统字段
+                                clean_metadata = {}
+                                for k, v in row_dict.items():
+                                    if k not in ['id', 'embedding', 'dense_vector', 'document']:
+                                        # 确保值是 ChromaDB 支持的基本类型
+                                        if isinstance(v, (str, int, float, bool)):
+                                            clean_metadata[k] = v
+                                        elif v is None or (isinstance(v, float) and (pd.isna(v) or v in [np.inf, -np.inf])):
+                                            clean_metadata[k] = ""
+                                        else:
+                                            clean_metadata[k] = str(v)
+                                # 添加更新时间戳和来源文件
+                                clean_metadata['upload_time'] = time.time()
+                                clean_metadata['source_file'] = filename
+                                metadatas_to_update.append(clean_metadata)
+
+                            try:
+                                success = self.vector_client.update_data(
+                                    collection_name,
+                                    ids_to_update,
+                                    embeddings=None,  # 不更新向量
+                                    documents=None,   # 不更新 document
+                                    metadatas=metadatas_to_update
+                                )
+                                if success:
+                                    updated_count += len(batch)
+                            except Exception as e:
+                                logger.warning(f"任务 {task_id} 批量更新 metadata 失败: {e}")
+                                # 继续处理其他批次
+
+                    self.update_progress(task_id, progress_storage, "去重检查", 3, total_stages,
+                                        message=f"去重完成：跳过 {skipped_duplicates} 条，更新 {updated_count} 条，待新增 {len(rows_to_process)} 条",
+                                        stage_completed=True)
+
+                    # 更新进度存储中的计数
+                    progress_storage[task_id]["skipped_duplicates"] = skipped_duplicates
+                    progress_storage[task_id]["updated_records"] = updated_count
+                else:
+                    # 不启用增量上传，处理所有记录
+                    self.update_progress(task_id, progress_storage, "去重检查", 3, total_stages,
+                                        message="增量上传已禁用，将处理所有记录",
+                                        stage_completed=True)
+                    rows_to_process = all_row_data
+                    original_indices = [idx for idx, _, _ in all_row_data]
+
+                # 如果没有新记录需要处理
+                if not rows_to_process:
+                    stats = self.vector_client.get_collection_stats(collection_name) if self.vector_client.has_collection(collection_name) else {}
+                    message = "所有记录已存在于知识库中，无新增数据"
+                    if updated_count > 0:
+                        message = f"列更新完成：更新 {updated_count} 条记录，无新增数据"
+                    progress_storage[task_id].update({
+                        "status": "completed",
+                        "stage": "处理完成",
+                        "stage_number": total_stages,
+                        "total_stages": total_stages,
+                        "progress_percent": 100,
+                        "message": message,
+                        "result": {
+                            "collection_name": collection_name,
+                            "file_name": filename,
+                            "total_records": len(df),
+                            "skipped_duplicates": skipped_duplicates,
+                            "updated_records": updated_count,
+                            "inserted_records": 0,
+                            "embedding_failed_count": 0,
+                            "storage_failed_count": 0,
+                            "collection_stats": stats
+                        }
+                    })
+                    return
+
+                # 阶段4: 准备向量数据库 - 开始
+                self.update_progress(task_id, progress_storage, "准备向量数据库", 4, total_stages,
+                                     message="正在创建或连接collection...")
+
+                # 创建或获取collection，并管理 metadata
+                if not self.vector_client.has_collection(collection_name):
+                    # 非增量上传：创建新 Collection 并保存 metadata
+                    # 生成默认的 display_name 作为 description（将下划线替换为空格，首字母大写）
+                    default_description = collection_name.replace("_", " ").title()
+                    collection_metadata = {
+                        "embedding_template": embedding_template,
+                        "document_template": document_template,
+                        "source_files": filename,  # 初始只有一个文件
+                        "user_description": default_description  # 用户可编辑的描述，默认为格式化后的库名
+                    }
+                    self.vector_client.create_collection(collection_name, metadata=collection_metadata)
+                    logger.info(f"任务 {task_id} 创建新 Collection '{collection_name}'，保存 metadata: {collection_metadata}")
+                else:
+                    # 增量上传：更新 source_files
+                    if enable_incremental:
+                        try:
+                            stats = self.vector_client.get_collection_stats(collection_name)
+                            current_metadata = stats.get("metadata", {})
+                            current_files = current_metadata.get("source_files", "")
+
+                            # 追加新文件名（避免重复）
+                            file_list = [f.strip() for f in current_files.split(",") if f.strip()]
+                            if filename not in file_list:
+                                file_list.append(filename)
+                                new_source_files = ",".join(file_list)
+                                self.vector_client.update_collection_metadata(
+                                    collection_name,
+                                    {"source_files": new_source_files}
+                                )
+                                logger.info(f"任务 {task_id} 更新 Collection '{collection_name}' 的 source_files: {new_source_files}")
+                        except Exception as metadata_error:
+                            logger.warning(f"任务 {task_id} 更新 metadata 失败（不影响上传）: {metadata_error}")
+
+                # 计算待处理记录数
+                records_to_process_count = len(rows_to_process)
+
+                # 阶段4: 准备向量数据库 - 完成
+                self.update_progress(task_id, progress_storage, "准备向量数据库", 4, total_stages,
+                                     message=f"Collection准备完成，共 {records_to_process_count} 条记录待处理",
+                                     stage_completed=True)
+
+                # 阶段5: 向量化并存储（边向量化边插入，减少堆积，防止中途出错前面白跑）
+                self.update_progress(task_id, progress_storage, "向量化并存储", 5, total_stages,
+                                     message="正在准备embedding文本...")
+
+                # 从 rows_to_process 中提取 embedding 文本和 document 文本
+                embedding_texts = []
+                document_texts = []
+                processed_row_data = []  # 保存处理过的行数据，用于后续存储
+
+                for idx, row_dict, document_text in rows_to_process:
+                    # 生成 embedding 文本
                     embedding_text = self._parse_embedding_template(embedding_template, row_dict)
                     embedding_texts.append(embedding_text)
-
-                    document_text = self._parse_embedding_template(document_template, row_dict)
                     document_texts.append(document_text)
-
-                # 更新进度：文本生成完成，开始计算向量
-                self.update_progress(task_id, progress_storage, "生成向量嵌入", 4, total_stages,
-                                     message=f"正在使用 {num_workers} 个Worker计算向量嵌入...", sub_progress=0.1)
+                    processed_row_data.append((idx, row_dict))
 
                 # 【重要】记录使用的embedding模型
                 logger.info(f"任务 {task_id} 使用embedding模型: provider={embedding_provider}, model={embedding_model}, batch_size={batch_size}, num_workers={num_workers}")
 
-                # 向量化（支持并发Worker）
+                # 计算插入批次信息
+                insert_batch_size = batch_size * insert_batch_multiplier
+                total_insert_batches = (records_to_process_count + insert_batch_size - 1) // insert_batch_size if records_to_process_count > 0 else 0
+                inserted_count = 0
+
                 embedding_start_time = time.time()
                 loop = asyncio.get_event_loop()
 
-                if num_workers <= 1:
-                    # 单Worker模式（原有逻辑）
-                    def embedding_progress_callback(completed_batches: int, total_embedding_batches: int, message: str):
-                        """Embedding进度回调函数"""
-                        embedding_progress = 0.1 + (
-                                    completed_batches / total_embedding_batches * 0.9) if total_embedding_batches > 0 else 0.1
-                        self.update_progress(
-                            task_id, progress_storage, "生成向量嵌入", 4, total_stages,
-                            message=f"向量化进度: {completed_batches}/{total_embedding_batches} 批次 - {message}",
-                            sub_progress=embedding_progress
-                        )
+                self.update_progress(task_id, progress_storage, "向量化并存储", 5, total_stages,
+                                     1, total_insert_batches,
+                                     f"共 {records_to_process_count} 条记录，分 {total_insert_batches} 批处理（每批 {insert_batch_size} 条），使用 {num_workers} 个Worker")
 
-                    vectors = await loop.run_in_executor(
-                        None,
-                        self.embedding_service.encode_texts_with_progress,
-                        embedding_texts,
-                        embedding_progress_callback,
-                        embedding_provider,
-                        embedding_model,
-                        batch_size
-                    )
-                else:
-                    # 多Worker并发模式
-                    text_chunks = self._split_into_chunks(embedding_texts, num_workers)
-                    actual_workers = len(text_chunks)
+                # 按 insert_batch_size 分批，每批内向量化后立即插入数据库
+                for insert_batch_idx in range(total_insert_batches):
+                    chunk_start = insert_batch_idx * insert_batch_size
+                    chunk_end = min((insert_batch_idx + 1) * insert_batch_size, records_to_process_count)
+                    current_insert_batch = insert_batch_idx + 1
 
-                    # 进度聚合器
-                    worker_progress = {i: {"completed": 0, "total": 0} for i in range(actual_workers)}
-                    progress_lock = threading.Lock()
+                    chunk_embedding_texts = embedding_texts[chunk_start:chunk_end]
+                    chunk_document_texts = document_texts[chunk_start:chunk_end]
+                    chunk_row_data = processed_row_data[chunk_start:chunk_end]
 
-                    def make_worker_callback(worker_id):
-                        def callback(completed, total, message):
-                            with progress_lock:
-                                worker_progress[worker_id] = {"completed": completed, "total": total}
-                                # 计算总进度
-                                total_completed = sum(wp["completed"] for wp in worker_progress.values())
-                                total_batches_all = sum(wp["total"] for wp in worker_progress.values())
-                                if total_batches_all > 0:
-                                    sub_progress = 0.1 + (total_completed / total_batches_all * 0.9)
+                    # --- 向量化当前 chunk ---
+                    self.update_progress(task_id, progress_storage, "向量化并存储", 5, total_stages,
+                                         current_insert_batch, total_insert_batches,
+                                         f"批次 {current_insert_batch}/{total_insert_batches} 正在向量化 ({chunk_end - chunk_start} 条)...",
+                                         sub_progress=0.0)
+
+                    chunk_vectors = None
+
+                    if num_workers <= 1:
+                        # 单Worker模式（带容错）
+                        def make_embedding_callback(ib_idx, total_ib):
+                            def callback(completed_batches: int, total_embedding_batches: int, message: str):
+                                embedding_progress = (completed_batches / total_embedding_batches) if total_embedding_batches > 0 else 0
+                                # sub_progress 表示当前插入批次内 embedding 的进度 (0.0-0.9)，预留0.1给插入
+                                self.update_progress(
+                                    task_id, progress_storage, "向量化并存储", 5, total_stages,
+                                    ib_idx + 1, total_ib,
+                                    f"批次 {ib_idx+1}/{total_ib} 向量化: {completed_batches}/{total_embedding_batches} - {message}",
+                                    sub_progress=embedding_progress * 0.9
+                                )
+                            return callback
+
+                        try:
+                            chunk_vectors = await loop.run_in_executor(
+                                None,
+                                self.embedding_service.encode_texts_with_progress,
+                                chunk_embedding_texts,
+                                make_embedding_callback(insert_batch_idx, total_insert_batches),
+                                embedding_provider,
+                                embedding_model,
+                                batch_size
+                            )
+                        except Exception as batch_error:
+                            # 批量失败，降级为逐条向量化
+                            logger.warning(f"任务 {task_id} 批次 {current_insert_batch} 批量向量化失败: {batch_error}，尝试逐条处理")
+                            chunk_vectors = []
+                            for i, text in enumerate(chunk_embedding_texts):
+                                try:
+                                    vec = await self._vectorize_single_text(text, embedding_provider, embedding_model)
+                                    chunk_vectors.append(vec)
+                                except Exception as single_error:
+                                    logger.warning(f"任务 {task_id} 记录 {chunk_start + i} 向量化失败: {single_error}")
+                                    embedding_failed_count += 1
+                                    chunk_vectors.append(None)
+                                    original_idx = chunk_row_data[i][0]
+                                    failed_records.append({
+                                        "row_index": original_idx,
+                                        "reason": "embedding_failed",
+                                        "error": str(single_error),
+                                        "data": chunk_row_data[i][1]
+                                    })
+                                # 更新进度
+                                if (i + 1) % 10 == 0 or (i + 1) == len(chunk_embedding_texts):
+                                    progress = (i + 1) / len(chunk_embedding_texts)
                                     self.update_progress(
-                                        task_id, progress_storage, "生成向量嵌入", 4, total_stages,
-                                        message=f"Worker进度: {total_completed}/{total_batches_all} 批次 ({actual_workers} Workers)",
-                                        sub_progress=sub_progress
+                                        task_id, progress_storage, "向量化并存储", 5, total_stages,
+                                        current_insert_batch, total_insert_batches,
+                                        f"批次 {current_insert_batch}/{total_insert_batches} 逐条向量化: {i + 1}/{len(chunk_embedding_texts)}",
+                                        sub_progress=progress * 0.9
                                     )
-                        return callback
-
-                    async def encode_chunk(worker_id, texts):
-                        """单个Worker的编码任务"""
-                        callback = make_worker_callback(worker_id)
-                        result = await loop.run_in_executor(
-                            None,
-                            self.embedding_service.encode_texts_with_progress_concurrent,
-                            texts,
-                            callback,
-                            embedding_provider,
-                            embedding_model,
-                            batch_size
-                        )
-                        return (worker_id, result)
-
-                    # 并发执行所有Worker
-                    tasks = [encode_chunk(i, chunk) for i, chunk in enumerate(text_chunks)]
-                    results = await asyncio.gather(*tasks)
-
-                    # 按原始顺序合并结果
-                    vectors = []
-                    for worker_id, result in sorted(results, key=lambda x: x[0]):
-                        vectors.extend(result)
-
-                embedding_end_time = time.time()
-                embedding_api_duration = embedding_end_time - embedding_start_time
-
-                # 阶段4: 生成向量嵌入 - 完成
-                self.update_progress(task_id, progress_storage, "生成向量嵌入", 4, total_stages,
-                                     message=f"向量嵌入生成完成，共 {len(vectors)} 个向量",
-                                     stage_completed=True)
-
-                # 阶段5: 存储到数据库 - 开始
-                inserted_count = 0
-
-                for batch_idx in range(total_batches):
-                    start_idx = batch_idx * batch_size
-                    end_idx = min((batch_idx + 1) * batch_size, len(df))
-                    current_batch = batch_idx + 1
-
-                    # 开始处理当前批次
-                    self.update_progress(task_id, progress_storage, "存储到向量数据库", 5, total_stages,
-                                         current_batch, total_batches,
-                                         f"正在处理第 {current_batch}/{total_batches} 批次 (记录 {start_idx + 1}-{end_idx})")
-
-                    # 准备批次数据
-                    batch_entities = []
-                    for i in range(start_idx, end_idx):
-                        entity = {}
-
-                        # 添加所有原始字段
-                        for column in df.columns:
-                            value = df.iloc[i][column]
-                            if pd.isna(value):
-                                entity[column] = ""
-                            else:
-                                # 使用sanitize_for_json处理值
-                                entity[column] = self.sanitize_for_json(value)
-
-                        # 添加向量和文档 - 确保向量也被正确处理
-                        entity["embedding"] = self.sanitize_for_json(vectors[i])
-                        entity["dense_vector"] = self.sanitize_for_json(vectors[i])
-                        entity["document"] = document_texts[i]
-                        entity["source_file"] = filename
-                        entity["upload_time"] = time.time()
-
-                        # 对整个实体进行最终清理
-                        entity = self.sanitize_for_json(entity)
-                        batch_entities.append(entity)
-
-                    # 插入数据
-                    success = self.vector_client.insert_data(collection_name, batch_entities)
-                    if success:
-                        inserted_count += len(batch_entities)
-                        logger.info(f"任务 {task_id} 批次 {current_batch} 插入成功，记录数: {len(batch_entities)}")
-
-                        # 当前批次完成
-                        self.update_progress(task_id, progress_storage, "存储到向量数据库", 5, total_stages,
-                                             current_batch, total_batches,
-                                             f"第 {current_batch}/{total_batches} 批次处理完成 (记录 {start_idx + 1}-{end_idx})",
-                                             batch_completed=True)
                     else:
-                        logger.error(f"任务 {task_id} 批次 {current_batch} 插入失败")
-                        # 即使失败也要更新进度，但不标记为已完成
-                        self.update_progress(task_id, progress_storage, "存储到向量数据库", 5, total_stages,
-                                             current_batch, total_batches,
-                                             f"第 {current_batch}/{total_batches} 批次处理失败")
+                        # 多Worker并发模式
+                        text_chunks = self._split_into_chunks(chunk_embedding_texts, num_workers)
+                        actual_workers = len(text_chunks)
+
+                        # 进度聚合器
+                        worker_progress = {i: {"completed": 0, "total": 0} for i in range(actual_workers)}
+                        progress_lock = threading.Lock()
+
+                        def make_worker_callback(worker_id, ib_idx, total_ib):
+                            def callback(completed, total, message):
+                                with progress_lock:
+                                    worker_progress[worker_id] = {"completed": completed, "total": total}
+                                    total_completed = sum(wp["completed"] for wp in worker_progress.values())
+                                    total_batches_all = sum(wp["total"] for wp in worker_progress.values())
+                                    if total_batches_all > 0:
+                                        embedding_progress = total_completed / total_batches_all
+                                        self.update_progress(
+                                            task_id, progress_storage, "向量化并存储", 5, total_stages,
+                                            ib_idx + 1, total_ib,
+                                            f"批次 {ib_idx+1}/{total_ib} Worker进度: {total_completed}/{total_batches_all} ({actual_workers} Workers)",
+                                            sub_progress=embedding_progress * 0.9
+                                        )
+                            return callback
+
+                        async def encode_chunk(worker_id, texts, start_offset):
+                            """单个Worker的编码任务（带容错）"""
+                            callback = make_worker_callback(worker_id, insert_batch_idx, total_insert_batches)
+                            try:
+                                result = await loop.run_in_executor(
+                                    None,
+                                    self.embedding_service.encode_texts_with_progress_concurrent,
+                                    texts,
+                                    callback,
+                                    embedding_provider,
+                                    embedding_model,
+                                    batch_size
+                                )
+                                return (worker_id, result, [])
+                            except Exception as batch_error:
+                                logger.warning(f"任务 {task_id} 批次 {current_insert_batch} Worker {worker_id} 批量向量化失败: {batch_error}，尝试逐条处理")
+                                vectors_fallback = []
+                                failed_indices = []
+                                for i, text in enumerate(texts):
+                                    global_idx = start_offset + i
+                                    try:
+                                        vec = await self._vectorize_single_text(text, embedding_provider, embedding_model)
+                                        vectors_fallback.append(vec)
+                                    except Exception as single_error:
+                                        logger.warning(f"任务 {task_id} Worker {worker_id} 记录 {global_idx} 向量化失败: {single_error}")
+                                        vectors_fallback.append(None)
+                                        failed_indices.append(global_idx)
+                                return (worker_id, vectors_fallback, failed_indices)
+
+                        # 计算每个chunk的起始偏移量
+                        chunk_offsets = []
+                        offset_val = 0
+                        for chunk in text_chunks:
+                            chunk_offsets.append(offset_val)
+                            offset_val += len(chunk)
+
+                        tasks = [encode_chunk(i, chunk, chunk_offsets[i]) for i, chunk in enumerate(text_chunks)]
+                        results = await asyncio.gather(*tasks)
+
+                        # 按原始顺序合并结果，并收集失败记录
+                        chunk_vectors = []
+                        for worker_id, result, failed_indices in sorted(results, key=lambda x: x[0]):
+                            chunk_vectors.extend(result)
+                            for local_idx in failed_indices:
+                                embedding_failed_count += 1
+                                original_idx = chunk_row_data[local_idx][0]
+                                failed_records.append({
+                                    "row_index": original_idx,
+                                    "reason": "embedding_failed",
+                                    "error": "向量化失败",
+                                    "data": chunk_row_data[local_idx][1]
+                                })
+
+                    # --- 过滤失败记录并构建 entity ---
+                    self.update_progress(task_id, progress_storage, "向量化并存储", 5, total_stages,
+                                         current_insert_batch, total_insert_batches,
+                                         f"批次 {current_insert_batch}/{total_insert_batches} 正在插入数据库...",
+                                         sub_progress=0.9)
+
+                    batch_entities = []
+                    for i in range(len(chunk_vectors)):
+                        if chunk_vectors[i] is None:
+                            continue  # 跳过 embedding 失败的记录
+                        try:
+                            original_idx, row_dict = chunk_row_data[i]
+                            entity = {}
+                            for key, value in row_dict.items():
+                                entity[key] = self.sanitize_for_json(value)
+                            entity["embedding"] = self.sanitize_for_json(chunk_vectors[i])
+                            entity["dense_vector"] = self.sanitize_for_json(chunk_vectors[i])
+                            entity["document"] = chunk_document_texts[i]
+                            entity["source_file"] = filename
+                            entity["upload_time"] = time.time()
+                            entity = self.sanitize_for_json(entity)
+                            batch_entities.append((chunk_start + i, entity))
+                        except Exception as e:
+                            logger.warning(f"任务 {task_id} 记录 {chunk_start + i} 准备失败: {e}")
+                            storage_failed_count += 1
+                            failed_records.append({
+                                "row_index": original_idx if 'original_idx' in dir() else chunk_start + i,
+                                "reason": "prepare_failed",
+                                "error": str(e),
+                                "data": row_dict if 'row_dict' in dir() else {}
+                            })
+
+                    # --- 立即插入数据库 ---
+                    if batch_entities:
+                        entities_to_insert = [entity for _, entity in batch_entities]
+                        try:
+                            success = self.vector_client.insert_data(collection_name, entities_to_insert)
+                            if success:
+                                inserted_count += len(entities_to_insert)
+                                logger.info(f"任务 {task_id} 批次 {current_insert_batch} 插入成功，记录数: {len(entities_to_insert)}")
+                            else:
+                                # 批量插入失败，尝试逐条插入
+                                logger.warning(f"任务 {task_id} 批次 {current_insert_batch} 批量插入失败，尝试逐条插入")
+                                for idx, entity in batch_entities:
+                                    try:
+                                        single_success = self.vector_client.insert_data(collection_name, [entity])
+                                        if single_success:
+                                            inserted_count += 1
+                                        else:
+                                            original_idx = processed_row_data[idx][0]
+                                            storage_failed_count += 1
+                                            failed_records.append({
+                                                "row_index": original_idx,
+                                                "reason": "storage_failed",
+                                                "error": "插入失败",
+                                                "data": processed_row_data[idx][1]
+                                            })
+                                    except Exception as e:
+                                        original_idx = processed_row_data[idx][0]
+                                        storage_failed_count += 1
+                                        failed_records.append({
+                                            "row_index": original_idx,
+                                            "reason": "storage_failed",
+                                            "error": str(e),
+                                            "data": processed_row_data[idx][1]
+                                        })
+                        except Exception as e:
+                            # 批量插入异常，尝试逐条插入
+                            logger.warning(f"任务 {task_id} 批次 {current_insert_batch} 批量插入异常: {e}，尝试逐条插入")
+                            for idx, entity in batch_entities:
+                                try:
+                                    single_success = self.vector_client.insert_data(collection_name, [entity])
+                                    if single_success:
+                                        inserted_count += 1
+                                    else:
+                                        original_idx = processed_row_data[idx][0]
+                                        storage_failed_count += 1
+                                        failed_records.append({
+                                            "row_index": original_idx,
+                                            "reason": "storage_failed",
+                                            "error": "插入失败",
+                                            "data": processed_row_data[idx][1]
+                                        })
+                                except Exception as single_e:
+                                    original_idx = processed_row_data[idx][0]
+                                    storage_failed_count += 1
+                                    failed_records.append({
+                                        "row_index": original_idx,
+                                        "reason": "storage_failed",
+                                        "error": str(single_e),
+                                        "data": processed_row_data[idx][1]
+                                    })
+
+                    # 当前插入批次完成
+                    self.update_progress(task_id, progress_storage, "向量化并存储", 5, total_stages,
+                                         current_insert_batch, total_insert_batches,
+                                         f"第 {current_insert_batch}/{total_insert_batches} 批完成（已入库 {inserted_count} 条）",
+                                         batch_completed=True)
 
                     # 添加小延迟，让前端能看到进度变化
                     await asyncio.sleep(0.1)
 
-                # 获取最终统计信息
-                stats = self.vector_client.get_collection_stats(collection_name)
+                embedding_api_duration = time.time() - embedding_start_time
 
-                # 阶段5: 存储到数据库 - 完成（所有阶段完成）
+                # 获取最终统计信息
+                stats = self.vector_client.get_collection_stats(collection_name) if self.vector_client.has_collection(collection_name) else {}
+
+                # 如果所有记录都处理失败
+                if inserted_count == 0 and embedding_failed_count > 0:
+                    progress_storage[task_id].update({
+                        "status": "completed",
+                        "stage": "处理完成",
+                        "stage_number": total_stages,
+                        "total_stages": total_stages,
+                        "progress_percent": 100,
+                        "message": "所有记录向量化失败，没有数据可存储",
+                        "result": {
+                            "collection_name": collection_name,
+                            "file_name": filename,
+                            "total_records": len(df),
+                            "skipped_duplicates": skipped_duplicates,
+                            "embedding_failed_count": embedding_failed_count,
+                            "storage_failed_count": storage_failed_count,
+                            "inserted_records": 0,
+                            "failed_records": failed_records[:100] if len(failed_records) > 100 else failed_records,
+                            "total_failed_records": len(failed_records),
+                            "collection_stats": stats
+                        }
+                    })
+                    return
+
+                # 阶段5: 向量化并存储 - 完成（所有阶段完成）
                 progress_storage[task_id].update({
                     "status": "completed",
                     "stage": "处理完成",
                     "stage_number": total_stages,
                     "total_stages": total_stages,
-                    "current_batch": total_batches,
-                    "total_batches": total_batches,
+                    "current_batch": total_insert_batches,
+                    "total_batches": total_insert_batches,
                     "progress_percent": 100,
                     "message": "向量化处理已完成",
                     "result": {
                         "collection_name": collection_name,
                         "file_name": filename,
                         "total_records": len(df),
+                        "skipped_duplicates": skipped_duplicates,
+                        "updated_records": updated_count,
+                        "embedding_failed_count": embedding_failed_count,
+                        "storage_failed_count": storage_failed_count,
                         "inserted_records": inserted_count,
+                        "failed_records": failed_records[:100] if len(failed_records) > 100 else failed_records,
+                        "total_failed_records": len(failed_records),
                         "embedding_template_used": embedding_template,
                         "document_template_used": document_template,
                         "embedding_provider": embedding_provider or "default",
                         "embedding_model": embedding_model or "default",
                         "batch_size": batch_size,
-                        "total_batches": total_batches,
+                        "insert_batch_size": insert_batch_size,
+                        "total_batches": total_insert_batches,
                         "collection_stats": stats,
-                        "embedding_api_duration": round(embedding_api_duration, 2)  # Embedding API 总耗时（秒）
+                        "embedding_api_duration": round(embedding_api_duration, 2)
                     }
                 })
 

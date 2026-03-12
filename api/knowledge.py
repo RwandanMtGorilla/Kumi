@@ -51,11 +51,21 @@ async def retrieval(
         raise
     except Exception as e:
         logger.error(f"检索过程中发生错误: {e}")
+        error_msg = str(e)
+        # 检查是否是知识库不存在的错误
+        if "不存在" in error_msg and "知识库" in error_msg:
+            raise HTTPException(
+                status_code=404,
+                detail={
+                    "error_code": 2001,
+                    "error_msg": error_msg
+                }
+            )
         raise HTTPException(
             status_code=500,
             detail={
                 "error_code": 500,
-                "error_msg": f"内部服务器错误: {str(e)}"
+                "error_msg": f"内部服务器错误: {error_msg}"
             }
         )
 

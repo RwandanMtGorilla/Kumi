@@ -533,6 +533,18 @@ function triggerDefaultActiveButtons() {
     if (leftBottomBtn) {
         leftBottomBtn.click();
     }
+
+    // 右上默认激活: statistics（统计信息）
+    const statisticsBtn = document.querySelector('[data-side="right"][data-position="top"][data-panel="statistics"]');
+    if (statisticsBtn) {
+        statisticsBtn.click();
+    }
+
+    // 右下默认激活: filters（筛选器控制）
+    const filtersBtn = document.querySelector('[data-side="right"][data-position="bottom"][data-panel="filters"]');
+    if (filtersBtn) {
+        filtersBtn.click();
+    }
 }
 
 // =====
@@ -903,6 +915,11 @@ let globalUIState = {
     exclusiveMode: {
         active: false,
         editingIndex: null  // 正在编辑的图表索引
+    },
+
+    // 筛选器标签页（减数模式下使用）
+    filterTab: {
+        activeTab: 'main'  // 'main' | 'subtract'
     }
 };
 
@@ -1657,6 +1674,16 @@ function generateUniqueLabels(data, field) {
     });
 }
 
+// 生成完整标签（用于 hover 显示），最多 maxLength 字符
+function generateFullLabels(data, field, maxLength = 300) {
+    return data.map(item => {
+        let text = field === 'order_id'
+            ? `ID-${item[field]}`
+            : String(item[field] || 'N/A');
+        return text.length > maxLength ? text.slice(0, maxLength) + '...' : text;
+    });
+}
+
 // =====
 // 可视化控制与筛选
 // =====
@@ -1668,8 +1695,22 @@ function setTopkAxis(axis) {
     // 更新全局筛选器状态
     globalUIState.filters.uiState.topK.axis = axis;
 
-    // *** 只在独占模式下才保存到图表配置 ***
-    if (globalUIState.exclusiveMode.active && globalUIState.exclusiveMode.editingIndex !== null) {
+    // *** 根据当前标签页决定保存位置 ***
+    if (globalUIState.filterTab.activeTab === 'subtract' && globalUIState.dataSource.subtractIndex !== null) {
+        // 减数图筛选器标签：保存到减数图的visualConfig
+        const subtractIndex = globalUIState.dataSource.subtractIndex;
+        const config = allSimilarityResults[subtractIndex].visualConfig;
+        config.filters.topK.axis = axis;
+
+        // 标记布尔矩阵缓存失效（轴变化会改变Top-K结果）
+        if (config.cachedMasks) {
+            config.cachedMasks.topKMask = null;
+            config.cachedMasks.finalMask = null;
+        }
+
+        console.log(`[减数图筛选器] 保存Top-K轴: ${axis}，缓存已失效`);
+    } else if (globalUIState.exclusiveMode.active && globalUIState.exclusiveMode.editingIndex !== null) {
+        // 独占模式：保存到编辑中的图表配置
         const config = allSimilarityResults[globalUIState.exclusiveMode.editingIndex].visualConfig;
         config.filters.topK.axis = axis;
 
@@ -1826,6 +1867,9 @@ async function calculateSimilarity() {
         globalUIState.filters.activeFilterIndices = [];
         globalUIState.exclusiveMode.active = false;
         globalUIState.exclusiveMode.editingIndex = null;
+
+        // 隐藏筛选器标签切换（重置时确保是主筛选器标签）
+        hideFilterTabs();
 
         // *** 新架构：更新图表列表UI ***
         updateMatrixListUI();
@@ -2127,60 +2171,25 @@ function updateHeatmapData(matrix, xLabels, yLabels, preserveLayout = null, zOnl
     // 获取当前模式的相似度范围
     const range = getCurrentSimilarityRange();
 
-    // 准备 customdata：为每个格点存储完整的显示文本（支持换行）
-    const xDisplayField = document.getElementById('xDisplayField').value;
-    const yDisplayField = document.getElementById('yDisplayField').value;
+    // 获取显示字段用于坐标轴标题
+    const xDisplayField = globalUIState.displayFields.xField || 'order_id';
+    const yDisplayField = globalUIState.displayFields.yField || 'order_id';
 
-    const customdata = matrix.map((row, yIdx) =>
-        row.map((val, xIdx) => {
-            // 获取原始数据项
-            const xItem = currentXData[xIdx];
-            const yItem = currentYData[yIdx];
-
-            // 获取完整的字段值
-            let xFullText = '';
-            let yFullText = '';
-
-            if (xItem) {
-                if (xDisplayField === 'order_id') {
-                    xFullText = `ID-${xItem[xDisplayField]}`;
-                } else {
-                    xFullText = String(xItem[xDisplayField] || 'N/A');
-                }
-            }
-
-            if (yItem) {
-                if (yDisplayField === 'order_id') {
-                    yFullText = `ID-${yItem[yDisplayField]}`;
-                } else {
-                    yFullText = String(yItem[yDisplayField] || 'N/A');
-                }
-            }
-
-            // 应用自动换行
-            return {
-                xText: wrapTextForTooltip(xFullText, 50),
-                yText: wrapTextForTooltip(yFullText, 50)
-            };
-        })
-    );
-    console.log(`[DEBUG] updateHeatmapData - 准备customdata 耗时: ${((performance.now() - stepTime) / 1000).toFixed(3)}s`);
-    stepTime = performance.now();
-
-    isInDifferenceMode() ? '差值' : '相似度';
-    isInDifferenceMode() ? 0.2 : 0.1;
+    // 更新全局完整标签（供 hover 事件使用）
+    window._heatmapFullLabels = {
+        x: generateFullLabels(currentXData, xDisplayField),
+        y: generateFullLabels(currentYData, yDisplayField)
+    };
 
     if (preserveLayout) {
-        document.getElementById('heatmap');
         // 使用 Plotly.restyle 只更新数据，不影响布局
         Plotly.restyle('heatmap', {
             z: [matrix],
-            x: [xLabels],
-            y: [yLabels],
-            customdata: [customdata],  // 同时更新 customdata
+            x: [xLabels],   // 使用截断标签
+            y: [yLabels],   // 使用截断标签
             colorscale: [colorSchemes[currentColorScheme]],
-            zmin: [range.min],  // 添加这行
-            zmax: [range.max]   // 添加这行
+            zmin: [range.min],
+            zmax: [range.max]
         });
         console.log(`[DEBUG] updateHeatmapData - Plotly.restyle(full) 耗时: ${((performance.now() - stepTime) / 1000).toFixed(3)}s`);
         stepTime = performance.now();
@@ -2258,57 +2267,22 @@ function createHeatmap(matrix = filteredMatrix, xLabels = currentXLabels, yLabel
     // 获取当前模式的相似度范围
     const range = getCurrentSimilarityRange();
 
-    // 准备 customdata：为每个格点存储完整的显示文本（支持换行）
-    const xDisplayField = document.getElementById('xDisplayField').value;
-    const yDisplayField = document.getElementById('yDisplayField').value;
-
-    const customdata = matrix.map((row, yIdx) =>
-        row.map((val, xIdx) => {
-            // 获取原始数据项
-            const xItem = currentXData[xIdx];
-            const yItem = currentYData[yIdx];
-
-            // 获取完整的字段值
-            let xFullText = '';
-            let yFullText = '';
-
-            if (xItem) {
-                if (xDisplayField === 'order_id') {
-                    xFullText = `ID-${xItem[xDisplayField]}`;
-                } else {
-                    xFullText = String(xItem[xDisplayField] || 'N/A');
-                }
-            }
-
-            if (yItem) {
-                if (yDisplayField === 'order_id') {
-                    yFullText = `ID-${yItem[yDisplayField]}`;
-                } else {
-                    yFullText = String(yItem[yDisplayField] || 'N/A');
-                }
-            }
-
-            // 应用自动换行
-            return {
-                xText: wrapTextForTooltip(xFullText, 50),
-                yText: wrapTextForTooltip(yFullText, 50)
-            };
-        })
-    );
+    // 生成完整标签数组（一维），存入全局变量供 hover 事件使用
+    const xDisplayField = globalUIState.displayFields.xField || 'order_id';
+    const yDisplayField = globalUIState.displayFields.yField || 'order_id';
+    window._heatmapFullLabels = {
+        x: generateFullLabels(currentXData, xDisplayField),
+        y: generateFullLabels(currentYData, yDisplayField)
+    };
 
     const trace = {
         z: matrix,
-        x: xLabels,
-        y: yLabels,
-        customdata: customdata,  // 添加 customdata
+        x: xLabels,   // 使用截断标签，保持坐标轴自动合并
+        y: yLabels,   // 使用截断标签，保持坐标轴自动合并
         type: 'heatmap',
         colorscale: colorSchemes[currentColorScheme],
         hoverongaps: false,
-        // 修改 hovertemplate 使用 customdata 中的换行文本
-        hovertemplate: '<b>Y: %{customdata.yText}</b><br>' +
-            '<b>X: %{customdata.xText}</b><br>' +
-            '<b>相似度: %{z:.4f}</b>' +
-            '<extra></extra>',
+        hoverinfo: 'none',  // 禁用默认 hover，使用自定义
         colorbar: {
             title: isInDifferenceMode() ? '差值' : '相似度',
             titleside: 'right',
@@ -2427,6 +2401,53 @@ function createHeatmap(matrix = filteredMatrix, xLabels = currentXLabels, yLabel
 
     // 使用 Plotly.newPlot 重新创建图表
     Plotly.newPlot('heatmap', [trace], layout, config);
+
+    // 创建或获取自定义 tooltip 元素
+    let customTooltip = document.getElementById('heatmap-custom-tooltip');
+    if (!customTooltip) {
+        customTooltip = document.createElement('div');
+        customTooltip.id = 'heatmap-custom-tooltip';
+        customTooltip.style.cssText = `
+            position: fixed;
+            background: rgba(255, 255, 255, 0.95);
+            border: 1px solid #404040;
+            border-radius: 4px;
+            padding: 8px 12px;
+            font-size: 12px;
+            color: #404040;
+            pointer-events: none;
+            z-index: 10000;
+            max-width: 400px;
+            word-wrap: break-word;
+            display: none;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+        `;
+        document.body.appendChild(customTooltip);
+    }
+
+    // 添加自定义 hover 事件处理
+    const heatmapDiv = document.getElementById('heatmap');
+    heatmapDiv.on('plotly_hover', function(data) {
+        const pt = data.points[0];
+        const xIdx = pt.pointNumber[1];  // 列索引
+        const yIdx = pt.pointNumber[0];  // 行索引
+        const fullLabels = window._heatmapFullLabels;
+        const xText = fullLabels?.x?.[xIdx] || pt.x;
+        const yText = fullLabels?.y?.[yIdx] || pt.y;
+        const similarity = pt.z?.toFixed(4) || 'N/A';
+
+        customTooltip.innerHTML = `<b>Y:</b> ${yText}<br><b>X:</b> ${xText}<br><b>相似度:</b> ${similarity}`;
+        customTooltip.style.display = 'block';
+
+        // 定位 tooltip
+        const rect = heatmapDiv.getBoundingClientRect();
+        customTooltip.style.left = (data.event.clientX + 15) + 'px';
+        customTooltip.style.top = (data.event.clientY + 15) + 'px';
+    });
+
+    heatmapDiv.on('plotly_unhover', function() {
+        customTooltip.style.display = 'none';
+    });
 }
 
 // 调整热力图大小以适应容器变化
@@ -2762,8 +2783,23 @@ function initRangeSlider() {
         globalUIState.filters.uiState.similarityRange.min = min;
         globalUIState.filters.uiState.similarityRange.max = max;
 
-        // *** 只在独占模式下才保存到图表配置 ***
-        if (globalUIState.exclusiveMode.active && globalUIState.exclusiveMode.editingIndex !== null) {
+        // *** 根据当前标签页决定保存位置 ***
+        if (globalUIState.filterTab.activeTab === 'subtract' && globalUIState.dataSource.subtractIndex !== null) {
+            // 减数图筛选器标签：保存到减数图的visualConfig
+            const subtractIndex = globalUIState.dataSource.subtractIndex;
+            const config = allSimilarityResults[subtractIndex].visualConfig;
+            config.similarityRange.min = min;
+            config.similarityRange.max = max;
+
+            // 标记布尔矩阵缓存失效
+            if (config.cachedMasks) {
+                config.cachedMasks.thresholdMask = null;
+                config.cachedMasks.finalMask = null;
+            }
+
+            console.log(`[减数图筛选器] 保存阈值范围: ${min.toFixed(2)} - ${max.toFixed(2)}，缓存已失效`);
+        } else if (globalUIState.exclusiveMode.active && globalUIState.exclusiveMode.editingIndex !== null) {
+            // 独占模式：保存到编辑中的图表配置
             const config = allSimilarityResults[globalUIState.exclusiveMode.editingIndex].visualConfig;
             config.similarityRange.min = min;
             config.similarityRange.max = max;
@@ -2872,8 +2908,22 @@ function initTopkSlider() {
         // 更新全局筛选器状态
         globalUIState.filters.uiState.topK.value = topkVal;
 
-        // *** 只在独占模式下才保存到图表配置 ***
-        if (globalUIState.exclusiveMode.active && globalUIState.exclusiveMode.editingIndex !== null) {
+        // *** 根据当前标签页决定保存位置 ***
+        if (globalUIState.filterTab.activeTab === 'subtract' && globalUIState.dataSource.subtractIndex !== null) {
+            // 减数图筛选器标签：保存到减数图的visualConfig
+            const subtractIndex = globalUIState.dataSource.subtractIndex;
+            const config = allSimilarityResults[subtractIndex].visualConfig;
+            config.filters.topK.value = topkVal;
+
+            // 标记布尔矩阵缓存失效
+            if (config.cachedMasks) {
+                config.cachedMasks.topKMask = null;
+                config.cachedMasks.finalMask = null;
+            }
+
+            console.log(`[减数图筛选器] 保存Top-K值: ${topkVal}，缓存已失效`);
+        } else if (globalUIState.exclusiveMode.active && globalUIState.exclusiveMode.editingIndex !== null) {
+            // 独占模式：保存到编辑中的图表配置
             const config = allSimilarityResults[globalUIState.exclusiveMode.editingIndex].visualConfig;
             config.filters.topK.value = topkVal;
 
@@ -3554,6 +3604,8 @@ function toggleApplyDataButton(index) {
                 globalUIState.dataSource.primaryIndex = subtractIdx;
                 globalUIState.dataSource.subtractIndex = null;
                 loadDataFromMatrix(subtractIdx, false);
+                // 退出减数模式，隐藏筛选器标签切换
+                hideFilterTabs();
             }
         } else if (globalUIState.dataSource.subtractIndex === index) {
             // 关闭减数
@@ -3561,6 +3613,8 @@ function toggleApplyDataButton(index) {
             matrixButtonStates[index].applyData = false;
             // 重新加载主数据源（退出差值模式）
             loadDataFromMatrix(globalUIState.dataSource.primaryIndex, false);
+            // 退出减数模式，隐藏筛选器标签切换
+            hideFilterTabs();
         }
     } else {
         // 当前未启用，要开启 - 先检查矩阵大小一致性
@@ -3585,13 +3639,26 @@ function toggleApplyDataButton(index) {
             // 已有主数据源，没有减数，设为减数（差值模式）
             globalUIState.dataSource.subtractIndex = index;
             matrixButtonStates[index].applyData = true;
+            // 同时激活减数图的筛选器
+            matrixButtonStates[index].applyFilter = true;
+            if (!globalUIState.filters.activeFilterIndices.includes(index)) {
+                globalUIState.filters.activeFilterIndices.push(index);
+            }
             loadDifferenceData(globalUIState.dataSource.primaryIndex, index);
         } else {
             // 已有主数据源和减数，替换减数
             const oldSubtract = globalUIState.dataSource.subtractIndex;
             matrixButtonStates[oldSubtract].applyData = false;
+            // 关闭旧减数的筛选器
+            matrixButtonStates[oldSubtract].applyFilter = false;
+            globalUIState.filters.activeFilterIndices = globalUIState.filters.activeFilterIndices.filter(i => i !== oldSubtract);
             globalUIState.dataSource.subtractIndex = index;
             matrixButtonStates[index].applyData = true;
+            // 同时激活新减数图的筛选器
+            matrixButtonStates[index].applyFilter = true;
+            if (!globalUIState.filters.activeFilterIndices.includes(index)) {
+                globalUIState.filters.activeFilterIndices.push(index);
+            }
             loadDifferenceData(globalUIState.dataSource.primaryIndex, index);
         }
     }
@@ -3731,6 +3798,201 @@ function loadDifferenceData(primaryIndex, subtractIndex) {
     track.style.width = pos.width + 'px';
 
     console.log('[差值模式] 阈值已重置为 -1.00 到 1.00');
+
+    // 显示筛选器标签切换
+    showFilterTabs();
+}
+
+// ============================================================================
+// 筛选器标签页切换功能
+// ============================================================================
+
+/**
+ * 显示筛选器标签页切换按钮（在减数模式下调用）
+ */
+function showFilterTabs() {
+    const header = document.getElementById('filterTabsHeader');
+    if (header) {
+        header.style.display = '';
+        console.log('[筛选器标签] 显示标签切换');
+    }
+}
+
+/**
+ * 隐藏筛选器标签页切换按钮并切回主筛选器
+ */
+function hideFilterTabs() {
+    const header = document.getElementById('filterTabsHeader');
+    if (header) {
+        header.style.display = 'none';
+        console.log('[筛选器标签] 隐藏标签切换');
+    }
+
+    // 切回主筛选器标签
+    if (globalUIState.filterTab.activeTab !== 'main') {
+        switchFilterTab('main');
+    }
+}
+
+/**
+ * 切换筛选器标签页
+ * @param {'main' | 'subtract'} tab - 目标标签
+ */
+function switchFilterTab(tab) {
+    console.log(`[筛选器标签] 切换到: ${tab}`);
+    globalUIState.filterTab.activeTab = tab;
+
+    // 更新按钮样式
+    const mainBtn = document.getElementById('mainFilterTab');
+    const subtractBtn = document.getElementById('subtractFilterTab');
+    if (mainBtn) mainBtn.classList.toggle('active', tab === 'main');
+    if (subtractBtn) subtractBtn.classList.toggle('active', tab === 'subtract');
+
+    // 更新提示文字
+    const hint = document.getElementById('filterTabHint');
+    if (hint) {
+        if (tab === 'main') {
+            hint.textContent = '当前作用于: 显示数据';
+        } else {
+            const subtractIndex = globalUIState.dataSource.subtractIndex;
+            const matrixName = allSimilarityResults[subtractIndex]?.name || `图表 ${subtractIndex + 1}`;
+            hint.textContent = `当前作用于: ${matrixName} (减数图)`;
+        }
+    }
+
+    // 控制显示字段选择器的显隐（减数图标签下隐藏）
+    const displayFieldControls = document.getElementById('displayFieldControls');
+    const yDisplayFieldControls = document.getElementById('yDisplayFieldControls');
+    if (tab === 'main') {
+        // 主筛选器：恢复显示字段选择器（如果有数据）
+        if (displayFieldControls && globalUIState.dataSource.xAvailableFields?.length > 0) {
+            displayFieldControls.style.display = '';
+        }
+        if (yDisplayFieldControls && globalUIState.dataSource.yAvailableFields?.length > 0) {
+            yDisplayFieldControls.style.display = '';
+        }
+    } else {
+        // 减数图筛选器：隐藏显示字段选择器
+        if (displayFieldControls) displayFieldControls.style.display = 'none';
+        if (yDisplayFieldControls) yDisplayFieldControls.style.display = 'none';
+    }
+
+    // 加载对应标签的筛选器值到UI
+    loadFilterValuesToUI(tab);
+}
+
+/**
+ * 根据当前标签加载筛选器值到UI控件
+ * @param {'main' | 'subtract'} tab
+ */
+function loadFilterValuesToUI(tab) {
+    let similarityRange, topK;
+
+    if (tab === 'main') {
+        // 主筛选器：使用当前逻辑（独占模式用编辑图配置，否则用临时筛选器或uiState）
+        if (globalUIState.exclusiveMode.active && globalUIState.exclusiveMode.editingIndex !== null) {
+            const config = allSimilarityResults[globalUIState.exclusiveMode.editingIndex].visualConfig;
+            similarityRange = config.similarityRange;
+            topK = config.filters?.topK || { value: 0, axis: 'x' };
+        } else {
+            // 使用临时筛选器状态
+            similarityRange = globalUIState.temporaryFilter.similarityRange;
+            topK = globalUIState.temporaryFilter.topK;
+        }
+
+        // 差值模式下，主筛选器使用 -1 到 1 范围
+        const isDiff = globalUIState.dataSource.subtractIndex !== null;
+        updateSimilaritySliderRange(isDiff ? -1 : 0, 1);
+    } else {
+        // 减数图筛选器：使用减数图的visualConfig
+        const subtractIndex = globalUIState.dataSource.subtractIndex;
+        if (subtractIndex === null) {
+            console.warn('[筛选器标签] 减数图标签下没有减数图');
+            return;
+        }
+        const config = allSimilarityResults[subtractIndex].visualConfig;
+        similarityRange = config.similarityRange;
+        topK = config.filters?.topK || { value: 0, axis: 'x' };
+
+        // 减数图筛选器使用 0 到 1 范围
+        updateSimilaritySliderRange(0, 1);
+    }
+
+    // 更新UI控件值
+    const minSlider = document.getElementById('minSimilaritySlider');
+    const maxSlider = document.getElementById('maxSimilaritySlider');
+    const minInput = document.getElementById('minSimilarityInput');
+    const maxInput = document.getElementById('maxSimilarityInput');
+    const topkSlider = document.getElementById('topkSlider');
+    const topkValueSpan = document.getElementById('topkValue');
+    const topkStatus = document.getElementById('topkStatus');
+
+    if (minSlider && maxSlider && minInput && maxInput) {
+        minSlider.value = similarityRange.min;
+        maxSlider.value = similarityRange.max;
+        minInput.value = similarityRange.min;
+        maxInput.value = similarityRange.max;
+
+        // 更新轨道
+        const track = document.getElementById('similarityTrack');
+        if (track) {
+            const pos = calculateTrackPosition(similarityRange.min, similarityRange.max, minSlider);
+            track.style.left = pos.left + 'px';
+            track.style.width = pos.width + 'px';
+        }
+    }
+
+    if (topkSlider && topkValueSpan) {
+        const topkVal = topK.value ?? 0;
+        topkSlider.value = topkVal;
+        topkValueSpan.textContent = topkVal;
+        if (topkStatus) {
+            topkStatus.textContent = topkVal === 0 ? '显示全部' : `每行/列前${topkVal}项`;
+        }
+    }
+
+    // 更新Top-K轴按钮
+    updateTopKAxisButtons(topK.axis ?? 'x');
+}
+
+/**
+ * 更新相似度滑块的范围
+ * @param {number} minRange - 最小值范围（如 0 或 -1）
+ * @param {number} maxRange - 最大值范围（如 1）
+ */
+function updateSimilaritySliderRange(minRange, maxRange) {
+    const minSlider = document.getElementById('minSimilaritySlider');
+    const maxSlider = document.getElementById('maxSimilaritySlider');
+    const minInput = document.getElementById('minSimilarityInput');
+    const maxInput = document.getElementById('maxSimilarityInput');
+
+    if (minSlider) {
+        minSlider.min = minRange;
+        minSlider.max = maxRange;
+    }
+    if (maxSlider) {
+        maxSlider.min = minRange;
+        maxSlider.max = maxRange;
+    }
+    if (minInput) {
+        minInput.min = minRange;
+        minInput.max = maxRange;
+    }
+    if (maxInput) {
+        maxInput.min = minRange;
+        maxInput.max = maxRange;
+    }
+}
+
+/**
+ * 更新Top-K轴按钮的激活状态
+ * @param {'x' | 'y'} axis
+ */
+function updateTopKAxisButtons(axis) {
+    const xBtn = document.getElementById('xAxisBtn');
+    const yBtn = document.getElementById('yAxisBtn');
+    if (xBtn) xBtn.classList.toggle('active', axis === 'x');
+    if (yBtn) yBtn.classList.toggle('active', axis === 'y');
 }
 
 /**
@@ -3872,6 +4134,9 @@ async function enterExclusiveMode(index) {
     globalUIState.dataSource.primaryIndex = index;
     globalUIState.dataSource.subtractIndex = null;
     globalUIState.filters.activeFilterIndices = [index];
+
+    // 进入独占模式时隐藏筛选器标签切换（退出减数模式）
+    hideFilterTabs();
 
     // 加载该图的所有配置
     loadDataFromMatrix(index, false);
